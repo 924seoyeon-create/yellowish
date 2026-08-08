@@ -37,6 +37,24 @@ icons/          PWA 아이콘 (192px, 512px)
 정적 파일만으로 구성되어 있어 GitHub Pages, Netlify, Vercel, Cloudflare Pages 등
 어디에든 그대로 올리면 동작합니다. 루트 디렉터리를 통째로 배포하세요.
 
+### GitHub Pages
+
+이 저장소에는 `.github/workflows/pages.yml`이 이미 포함되어 있어서, `main` 브랜치에
+푸시만 하면 자동으로 GitHub Pages에 배포됩니다.
+
+1. GitHub에서 새 저장소를 만듭니다 (Public/Private 무관, README 등 초기 파일 없이 빈 저장소로).
+2. 이 로컬 저장소에 원격을 연결하고 푸시합니다.
+   ```bash
+   git remote add origin https://github.com/<사용자명>/<저장소명>.git
+   git push -u origin main
+   ```
+3. GitHub 저장소 페이지에서 **Settings → Pages**로 이동해 **Source**를 **GitHub Actions**로 설정합니다.
+   (한 번만 설정하면 이후 `main`에 푸시할 때마다 자동 배포됩니다.)
+4. 잠시 후 **Settings → Pages** 상단에 표시되는 `https://<사용자명>.github.io/<저장소명>/` 주소로 접속하면 됩니다.
+
+모든 리소스 경로가 상대경로(`./style.css`, `./app.js` 등)로 되어 있어서, 저장소 이름이 붙는
+하위 경로(`/<저장소명>/`)에 배포되어도 그대로 동작합니다.
+
 ## PWA로 설치하기 (Microsoft Edge / Windows)
 
 1. Edge에서 배포된 주소(또는 로컬 서버 주소)로 접속합니다.
