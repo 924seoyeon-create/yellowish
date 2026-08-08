@@ -280,6 +280,7 @@ button{ font-family: inherit; }
   padding: 60px 10px 20px;
 }
 .empty-state .big-emoji{ font-size: 48px; display:block; margin-bottom: 14px; }
+.empty-state .big-emoji img{ height: 48px; width: auto; }
 .empty-state h2{ font-size: 19px; margin: 0 0 8px; }
 .empty-state p{ color: var(--text-soft); font-size: 14px; line-height:1.6; margin: 0 0 22px; }
 .shrine-hint{
@@ -290,6 +291,7 @@ button{ font-family: inherit; }
   line-height: 1.6;
 }
 .shrine-hint .bell{ font-size: 22px; display:block; margin-bottom:6px; }
+.shrine-hint .bell img{ height: 22px; width: auto; }
 
 /* ---------- Form ---------- */
 .field{ margin-bottom: 18px; }
@@ -347,6 +349,7 @@ h1.screen-title{ font-size: 22px; font-weight: 800; margin: 6px 0 18px; }
   display:inline-block;
   animation: bellShake 0.7s ease;
 }
+.bell-big img{ height: 64px; width: auto; display:block; }
 @keyframes bellShake{
   0%{ transform: rotate(0); }
   15%{ transform: rotate(-18deg); }
@@ -399,6 +402,7 @@ h1.screen-title{ font-size: 22px; font-weight: 800; margin: 6px 0 18px; }
 /* ---------- Focus complete ---------- */
 .complete-screen{ text-align:center; padding-top: 34px; }
 .complete-icon{ font-size: 44px; }
+.complete-icon img{ height: 44px; width: auto; }
 .complete-headline{ font-size: 20px; font-weight: 800; margin: 14px 0 4px; }
 .complete-sub{ color: var(--text-soft); font-size: 15px; margin-bottom: 26px; line-height:1.6; }
 .complete-minutes{ font-size: 48px; font-weight: 800; margin: 6px 0; }
@@ -499,6 +503,7 @@ nav.bottom-nav button{
   border-radius: 12px;
 }
 nav.bottom-nav button .icon{ font-size: 20px; }
+nav.bottom-nav button .icon img{ height: 20px; width: auto; }
 nav.bottom-nav button.active{ color: var(--orange); background: rgba(245,158,11,0.10); }
 
 a, button{ -webkit-tap-highlight-color: transparent; }

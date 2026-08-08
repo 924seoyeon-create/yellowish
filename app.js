@@ -241,7 +241,7 @@
           <button class="btn btn-primary" id="empty-add-btn">+ 오늘의 일 추가</button>
         </div>
         <div class="shrine-hint">
-          <span class="bell">🔔</span>
+          <span class="bell"><img src="icons/sinnaerim.png" alt=""></span>
           갑자기 신내림이 오면<br>바로 시작할 수도 있어요.
         </div>
       `;
@@ -484,6 +484,8 @@
 
   document.getElementById("detail-back").addEventListener("click", ()=>showScreen("home"));
 
+  document.getElementById("shrine-back").addEventListener("click", ()=>showScreen("home"));
+
   document.getElementById("header-add-btn").addEventListener("click", ()=>openAddTask());
 
   // ============ SOUND ============
@@ -511,14 +513,14 @@
     showScreen("shrine");
     playBellSound();
     const container = document.getElementById("shrine-content");
-    container.innerHTML = `<span class="bell-big">🔔</span>`;
+    container.innerHTML = `<span class="bell-big"><img src="icons/sinnaerim.png" alt=""></span>`;
 
     setTimeout(()=>{
       const task = selectShrineTask();
       if(!task){
         container.innerHTML = `
           <div class="empty-state" style="padding-top:20px;">
-            <span class="big-emoji">🔔</span>
+            <span class="big-emoji"><img src="icons/sinnaerim.png" alt=""></span>
             <h2>아직 불 붙은 일이 없습니다.</h2>
             <p>그래도 지금 집중하고 싶다면<br>새 작업을 하나 만들어주세요.</p>
             <button class="btn btn-primary" id="shrine-add-btn">작업 만들기</button>
@@ -690,7 +692,7 @@
 
     if(!interrupted){
       container.innerHTML = `
-        <div class="complete-icon">🔔</div>
+        <div class="complete-icon"><img src="icons/sinnaerim.png" alt=""></div>
         <div class="complete-headline">신내림 종료</div>
         <div class="complete-minutes">${session.actualDuration}분</div>
         <div class="complete-sub">동안 실제로 작업했습니다.<br><br>잘했습니다.<br>여기서 멈춰도 됩니다.</div>
