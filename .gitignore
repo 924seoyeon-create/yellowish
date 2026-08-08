@@ -1,0 +1,9 @@
+# local Claude Code config (personal, not part of the deployed site)
+.claude/
+
+# OS / editor noise
+.DS_Store
+Thumbs.db
+
+# env files (can opt-in for committing if needed)
+.env*

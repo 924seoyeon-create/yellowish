@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>노릇노릇</title>
+<meta name="description" content="해야 할 일을 지금 하게 만드는 앱, 노릇노릇">
+<meta name="theme-color" content="#EA580C">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="노릇노릇">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="app" class="pre-launch">
+
+  <!-- HOME (홈) -->
+  <section id="screen-splash" aria-label="홈">
+    <button class="splash-log" id="splash-log" aria-label="오늘의 작업 보기">
+      <span aria-hidden="true">🪵</span>
+    </button>
+    <p class="splash-tagline">오늘도 발등은<br>노릇노릇 익어가는 중</p>
+  </section>
+
+  <header class="appheader">
+    <div class="brand"><span class="brand-icon" aria-hidden="true">🔥</span>노릇노릇</div>
+    <button class="add-task-fab" id="header-add-btn" aria-label="새 작업 추가">+</button>
+  </header>
+
+  <main class="screens">
+
+    <!-- TODAY (오늘) -->
+    <section class="screen" id="screen-home" aria-label="오늘">
+      <div id="home-content"></div>
+    </section>
+
+    <!-- ADD TASK -->
+    <section class="screen" id="screen-add-task" aria-label="작업 추가">
+      <div class="backrow" id="add-task-back" tabindex="0" role="button" aria-label="뒤로 가기">← 뒤로</div>
+      <h1 class="screen-title" id="add-task-title">무엇을 해야 하나요?</h1>
+      <form id="task-form">
+        <div class="field">
+          <label for="f-title">할 일</label>
+          <input type="text" id="f-title" placeholder="예: 보고서 초안 작성" autocomplete="off" required>
+        </div>
+        <div class="field">
+          <label for="f-next">다음 행동 <span style="opacity:.6;font-weight:400;">(선택)</span></label>
+          <input type="text" id="f-next" placeholder="예: 첫 번째 문단 작성하기" autocomplete="off">
+        </div>
+        <div class="field">
+          <label for="f-deadline">마감 <span style="opacity:.6;font-weight:400;">(선택)</span></label>
+          <input type="datetime-local" id="f-deadline">
+        </div>
+        <div class="field">
+          <label>중요도</label>
+          <div class="radio-group" role="radiogroup" aria-label="중요도">
+            <label><input type="radio" name="importance" value="low"><span>낮음</span></label>
+            <label><input type="radio" name="importance" value="medium" checked><span>보통</span></label>
+            <label><input type="radio" name="importance" value="high"><span>높음</span></label>
+          </div>
+        </div>
+        <div class="field">
+          <label>긴급도</label>
+          <div class="radio-group" role="radiogroup" aria-label="긴급도">
+            <label><input type="radio" name="urgency" value="1"><span>여유</span></label>
+            <label><input type="radio" name="urgency" value="2"><span>보통</span></label>
+            <label><input type="radio" name="urgency" value="3" checked><span>주의</span></label>
+            <label><input type="radio" name="urgency" value="4"><span>긴급</span></label>
+            <label><input type="radio" name="urgency" value="5"><span>매우 긴급</span></label>
+          </div>
+        </div>
+        <div class="field">
+          <label for="f-commit">외부 약속 <span style="opacity:.6;font-weight:400;">(선택사항)</span></label>
+          <input type="text" id="f-commit" placeholder="선택사항" autocomplete="off">
+        </div>
+        <div class="field">
+          <label for="f-person">결과물을 보여줄 사람 <span style="opacity:.6;font-weight:400;">(선택사항)</span></label>
+          <input type="text" id="f-person" placeholder="선택사항" autocomplete="off">
+        </div>
+        <div class="field">
+          <label for="f-stop">오늘의 종료 기준 <span style="opacity:.6;font-weight:400;">(선택사항)</span></label>
+          <input type="text" id="f-stop" placeholder="선택사항" autocomplete="off">
+        </div>
+        <div class="divider"></div>
+        <button type="submit" class="btn btn-primary">저장</button>
+      </form>
+    </section>
+
+    <!-- TASK DETAIL -->
+    <section class="screen" id="screen-task-detail" aria-label="작업 상세">
+      <div class="backrow" id="detail-back" tabindex="0" role="button" aria-label="오늘로 돌아가기">← 오늘</div>
+      <div id="detail-content"></div>
+    </section>
+
+    <!-- SHRINE (신내림) -->
+    <section class="screen" id="screen-shrine" aria-label="신내림">
+      <div id="shrine-content" class="shrine-screen"></div>
+    </section>
+
+    <!-- FOCUS TIMER -->
+    <section class="screen" id="screen-focus" aria-label="집중 타이머">
+      <div class="focus-screen">
+        <div class="focus-label">FOCUS BURST</div>
+        <div class="focus-task" id="focus-task-name">-</div>
+        <div class="focus-time" id="focus-time" role="timer" aria-live="polite">00:00</div>
+        <div class="progress-track"><div class="progress-fill" id="focus-progress" style="width:0%"></div></div>
+        <div class="btn-row">
+          <button class="btn btn-secondary" id="focus-pause-btn">일시정지</button>
+          <button class="btn btn-primary" id="focus-stop-btn">중단</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- FOCUS COMPLETE -->
+    <section class="screen" id="screen-focus-complete" aria-label="집중 종료">
+      <div class="complete-screen" id="complete-content"></div>
+    </section>
+
+    <!-- PATTERN -->
+    <section class="screen" id="screen-pattern" aria-label="나의 패턴">
+      <div id="pattern-content"></div>
+    </section>
+
+  </main>
+
+  <nav class="bottom-nav" id="bottom-nav">
+    <button data-nav="home" aria-label="오늘"><span class="icon">🔥</span>오늘</button>
+    <button data-nav="shrine" aria-label="신내림"><span class="icon">🔔</span>신내림</button>
+    <button data-nav="pattern" aria-label="나의 패턴"><span class="icon">📊</span>패턴</button>
+  </nav>
+
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
