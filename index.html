@@ -26,7 +26,7 @@
   </section>
 
   <header class="appheader">
-    <div class="brand"><span class="brand-icon" aria-hidden="true">🔥</span>노릇노릇</div>
+    <div class="brand" id="brand-home-btn" role="button" tabindex="0" aria-label="첫 화면으로"><span class="brand-icon" aria-hidden="true">🔥</span>노릇노릇</div>
     <button class="add-task-fab" id="header-add-btn" aria-label="새 작업 추가">+</button>
   </header>
 
@@ -54,7 +54,40 @@
           <label>마감 <span style="opacity:.6;font-weight:400;">(선택)</span></label>
           <div class="deadline-picker-row">
             <button type="button" class="deadline-date-btn" id="f-deadline-date-btn">📅 날짜 선택</button>
-            <input type="time" id="f-deadline-time" aria-label="마감 시간">
+          </div>
+          <div class="time-picker-row">
+            <select id="f-deadline-ampm" aria-label="오전/오후">
+              <option value="AM">오전</option>
+              <option value="PM">오후</option>
+            </select>
+            <select id="f-deadline-hour" aria-label="시">
+              <option value="1">1시</option>
+              <option value="2">2시</option>
+              <option value="3">3시</option>
+              <option value="4">4시</option>
+              <option value="5">5시</option>
+              <option value="6">6시</option>
+              <option value="7">7시</option>
+              <option value="8">8시</option>
+              <option value="9">9시</option>
+              <option value="10">10시</option>
+              <option value="11">11시</option>
+              <option value="12">12시</option>
+            </select>
+            <select id="f-deadline-minute" aria-label="분">
+              <option value="00">00분</option>
+              <option value="05">05분</option>
+              <option value="10">10분</option>
+              <option value="15">15분</option>
+              <option value="20">20분</option>
+              <option value="25">25분</option>
+              <option value="30">30분</option>
+              <option value="35">35분</option>
+              <option value="40">40분</option>
+              <option value="45">45분</option>
+              <option value="50">50분</option>
+              <option value="55">55분</option>
+            </select>
           </div>
           <div class="deadline-clear" id="f-deadline-clear" hidden>마감일 지우기</div>
         </div>

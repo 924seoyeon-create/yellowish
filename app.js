@@ -146,6 +146,11 @@
     saveTasks();
   }
 
+  function deleteTask(id){
+    state.tasks = state.tasks.filter(t=>t.id!==id);
+    saveTasks();
+  }
+
   function getActiveTasks(){
     return state.tasks.filter(t=>t.status==="active");
   }
@@ -154,9 +159,25 @@
     return !!task.deadline && new Date(task.deadline).getTime() < Date.now();
   }
 
+  // Maps hours-until-deadline to an urgency tier so the fire actually climbs
+  // as the deadline nears, instead of sitting still at whatever level was
+  // picked in the form (spec §6: "긴급도가 증가할수록 불이 점점 위로 이동한다").
+  function timeBasedUrgencyLevel(deadlineIso){
+    const hours = (new Date(deadlineIso).getTime() - Date.now()) / 3600000;
+    if(hours >= 24) return 1;
+    if(hours >= 6) return 2;
+    if(hours >= 2) return 3;
+    if(hours >= 0.5) return 4;
+    return 5;
+  }
+
   function calculateUrgency(task){
-    // MVP: user-defined urgency is used directly.
-    // Later: combine deadline proximity + importance + externalCommitment + behavior patterns.
+    // With a deadline, time-to-deadline is the whole story — this is what
+    // lets the fire actually climb through all five tiers as it nears,
+    // rather than sitting wherever the form's radio happened to default.
+    // Without a deadline there's no time signal, so the manually chosen
+    // level is used as-is.
+    if(task.deadline) return timeBasedUrgencyLevel(task.deadline);
     return Math.min(5, Math.max(1, task.urgency||3));
   }
 
@@ -232,10 +253,19 @@
     showScreen("home");
   }
 
+  // Returns to the very first screen (the 🪵 splash) — used by tapping the
+  // "노릇노릇" brand text in the header from anywhere in the app.
+  function returnToSplash(){
+    document.getElementById("app").classList.add("pre-launch");
+  }
+
   // ============ MENTION (기본 멘트) ============
   // Shows a short mention line in place of a screen's content container,
   // then fades it out and hands off to renderFn. Spec requires every entry
   // into 오늘/신내림/패턴 to lead with its mention before the real content.
+  const MENTION_HOLD_MS = 1500;
+  const MENTION_FADE_MS = 320;
+
   function showMentionThen(containerEl, text, renderFn){
     if(reducedMotion()){ renderFn(); return; }
     containerEl.innerHTML = `<div class="mention-block"><div class="mention-text">${text}</div></div>`;
@@ -243,8 +273,8 @@
     requestAnimationFrame(()=> block.classList.add("show"));
     setTimeout(()=>{
       block.classList.add("hide");
-      setTimeout(renderFn, 260);
-    }, 700);
+      setTimeout(renderFn, MENTION_FADE_MS);
+    }, MENTION_HOLD_MS);
   }
 
   function enterHome(){
@@ -262,11 +292,12 @@
     document.getElementById("screen-"+name).classList.add("active");
 
     const nav = document.getElementById("bottom-nav");
-    const hideNavOn = ["focus", "focus-complete", "add-task", "task-detail", "shrine", "shrine-timer", "other-tasks", "calendar"];
+    const hideNavOn = ["focus", "focus-complete", "add-task", "task-detail", "other-tasks", "calendar"];
     nav.classList.toggle("hidden", hideNavOn.includes(name));
 
     document.querySelectorAll("#bottom-nav button").forEach(b=>{
-      b.classList.toggle("active", b.dataset.nav === name);
+      const isShrineTab = b.dataset.nav === "shrine" && (name === "shrine" || name === "shrine-timer");
+      b.classList.toggle("active", b.dataset.nav === name || isShrineTab);
     });
 
     if(name==="home") enterHome();
@@ -500,12 +531,38 @@
     }
   }
 
+  // AM/PM + 시 + 분 selects → "HH:mm" 24시간 문자열로 변환 (spec 요청: 오전/오후 숫자 선택 방식)
+  function getDeadlineTimeValue(){
+    const ampm = document.getElementById("f-deadline-ampm").value;
+    let hour = Number(document.getElementById("f-deadline-hour").value);
+    const minute = document.getElementById("f-deadline-minute").value;
+    if(ampm === "AM"){ if(hour===12) hour = 0; }
+    else{ if(hour!==12) hour += 12; }
+    return `${String(hour).padStart(2,"0")}:${minute}`;
+  }
+
+  function setDeadlineTimeSelects(date){
+    const h = date.getHours();
+    const ampm = h < 12 ? "AM" : "PM";
+    let h12 = h % 12; if(h12===0) h12 = 12;
+    const minute = String(Math.round(date.getMinutes()/5)*5 % 60).padStart(2,"0");
+    document.getElementById("f-deadline-ampm").value = ampm;
+    document.getElementById("f-deadline-hour").value = String(h12);
+    document.getElementById("f-deadline-minute").value = minute;
+  }
+
+  function resetDeadlineTimeSelects(){
+    document.getElementById("f-deadline-ampm").value = "PM";
+    document.getElementById("f-deadline-hour").value = "11";
+    document.getElementById("f-deadline-minute").value = "55";
+  }
+
   function openAddTask(editId){
     state.editTaskId = editId || null;
     const form = document.getElementById("task-form");
     form.reset();
     state.pickedDeadlineDate = null;
-    document.getElementById("f-deadline-time").value = "";
+    resetDeadlineTimeSelects();
     document.getElementById("add-task-title").textContent = editId ? "작업 수정" : "무엇을 해야 하나요?";
 
     if(editId){
@@ -516,7 +573,7 @@
         if(t.deadline){
           const d = new Date(t.deadline);
           state.pickedDeadlineDate = dateKey(d);
-          document.getElementById("f-deadline-time").value = `${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`;
+          setDeadlineTimeSelects(d);
         }
         document.querySelector(`input[name=importance][value="${t.importance}"]`).checked = true;
         document.querySelector(`input[name=urgency][value="${t.urgency}"]`).checked = true;
@@ -536,8 +593,7 @@
 
     let deadlineIso = null;
     if(state.pickedDeadlineDate){
-      const timeVal = document.getElementById("f-deadline-time").value || "23:59";
-      deadlineIso = new Date(`${state.pickedDeadlineDate}T${timeVal}:00`).toISOString();
+      deadlineIso = new Date(`${state.pickedDeadlineDate}T${getDeadlineTimeValue()}:00`).toISOString();
     }
 
     const data = {
@@ -570,7 +626,7 @@
   });
   document.getElementById("f-deadline-clear").addEventListener("click", ()=>{
     state.pickedDeadlineDate = null;
-    document.getElementById("f-deadline-time").value = "";
+    resetDeadlineTimeSelects();
     updateDeadlineDateButtonLabel();
   });
 
@@ -655,11 +711,22 @@
           <div class="other-task-title">${escapeHtml(t.title)}</div>
           ${t.deadline ? `<div class="other-task-deadline">${formatDeadline(t.deadline)}</div>` : ""}
         </div>
+        <button type="button" class="other-task-delete" data-id="${t.id}" aria-label="삭제">🗑</button>
       </div>
     `).join("");
 
     container.querySelectorAll(".other-task-item").forEach(el=>{
       bindActivate(el, ()=> openTaskDetail(el.dataset.id));
+    });
+    container.querySelectorAll(".other-task-delete").forEach(btn=>{
+      btn.addEventListener("click", (e)=>{
+        e.stopPropagation();
+        if(confirm("이 작업을 삭제할까요? 되돌릴 수 없습니다.")){
+          deleteTask(btn.dataset.id);
+          renderOtherTasks();
+        }
+      });
+      btn.addEventListener("keydown", e=> e.stopPropagation());
     });
   }
 
@@ -791,7 +858,7 @@
       <div class="shrine-arrived">왔다</div>
     `;
 
-    const delay = reducedMotion() ? 0 : 700;
+    const delay = reducedMotion() ? 0 : MENTION_HOLD_MS;
     setTimeout(renderShrineReady, delay);
   }
 
@@ -800,8 +867,8 @@
     const task = selectShrineTask();
     container.innerHTML = `
       <span class="bell-big small"><img src="icons/sinnaerim.png" alt=""></span>
-      <div class="shrine-question">집중할 수 있는 순간이 왔어?</div>
-      <div class="shrine-answer">그럼 지금 써.</div>
+      <div class="shrine-question">지금의 내가</div>
+      <div class="shrine-answer">미래의 나를 구한다</div>
       ${task ? `<div class="shrine-current-task">지금: ${escapeHtml(task.title)}</div>` : ""}
       <div class="shrine-stopwatch-preview">00:00:00</div>
       <button type="button" class="btn btn-primary" id="shrine-start-btn">시작</button>
@@ -1227,9 +1294,25 @@
   document.querySelectorAll("#bottom-nav button").forEach(btn=>{
     btn.addEventListener("click", ()=>{
       const target = btn.dataset.nav;
-      if(target === "shrine"){ openShrine(); }
-      else{ showScreen(target); }
+      if(target === "shrine"){
+        // A stopwatch already running takes precedence over restarting the
+        // 왔다 ritual — the nav is visible during 신내림 now (spec change),
+        // so tapping the tab again should return to the running timer.
+        if(state.currentFocus && state.currentFocus.mode === "divine"){
+          showScreen("shrine-timer");
+          runShrineTimer();
+        }else{
+          openShrine();
+        }
+      }else{
+        showScreen(target);
+      }
     });
+  });
+
+  document.getElementById("brand-home-btn").addEventListener("click", returnToSplash);
+  document.getElementById("brand-home-btn").addEventListener("keydown", e=>{
+    if(e.key==="Enter" || e.key===" "){ e.preventDefault(); returnToSplash(); }
   });
 
   document.getElementById("splash-log").addEventListener("click", enterAppFromSplash);
