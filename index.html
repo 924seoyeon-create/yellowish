@@ -51,8 +51,12 @@
           <input type="text" id="f-next" placeholder="예: 첫 번째 문단 작성하기" autocomplete="off">
         </div>
         <div class="field">
-          <label for="f-deadline">마감 <span style="opacity:.6;font-weight:400;">(선택)</span></label>
-          <input type="datetime-local" id="f-deadline">
+          <label>마감 <span style="opacity:.6;font-weight:400;">(선택)</span></label>
+          <div class="deadline-picker-row">
+            <button type="button" class="deadline-date-btn" id="f-deadline-date-btn">📅 날짜 선택</button>
+            <input type="time" id="f-deadline-time" aria-label="마감 시간">
+          </div>
+          <div class="deadline-clear" id="f-deadline-clear" hidden>마감일 지우기</div>
         </div>
         <div class="field">
           <label>중요도</label>
@@ -101,10 +105,23 @@
       <div id="shrine-content" class="shrine-screen"></div>
     </section>
 
-    <!-- FOCUS TIMER -->
+    <!-- SHRINE STOPWATCH (신내림 스톱워치, count-up) -->
+    <section class="screen" id="screen-shrine-timer" aria-label="신내림 스톱워치">
+      <div class="focus-screen shrine-timer-screen">
+        <div class="focus-label"><span class="bell-sm"><img src="icons/sinnaerim.png" alt=""></span> 신내림</div>
+        <div class="focus-task" id="shrine-timer-task-name">-</div>
+        <div class="focus-time" id="shrine-timer-time" role="timer" aria-live="polite">00:00:00</div>
+        <div class="axe-easteregg" id="shrine-axe" hidden>🪓</div>
+        <div class="btn-row">
+          <button class="btn btn-primary" id="shrine-timer-stop-btn">멈추기</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- FOCUS TIMER (오늘 전용, countdown) -->
     <section class="screen" id="screen-focus" aria-label="집중 타이머">
       <div class="focus-screen">
-        <div class="focus-label">FOCUS BURST</div>
+        <div class="focus-label">지금 시작</div>
         <div class="focus-task" id="focus-task-name">-</div>
         <div class="focus-time" id="focus-time" role="timer" aria-live="polite">00:00</div>
         <div class="progress-track"><div class="progress-fill" id="focus-progress" style="width:0%"></div></div>
@@ -118,6 +135,19 @@
     <!-- FOCUS COMPLETE -->
     <section class="screen" id="screen-focus-complete" aria-label="집중 종료">
       <div class="complete-screen" id="complete-content"></div>
+    </section>
+
+    <!-- OTHER TASKS (다른 작업) -->
+    <section class="screen" id="screen-other-tasks" aria-label="다른 작업">
+      <div class="backrow" id="other-tasks-back" tabindex="0" role="button" aria-label="오늘로 돌아가기">← 오늘</div>
+      <h1 class="screen-title">다른 작업</h1>
+      <div id="other-tasks-content"></div>
+    </section>
+
+    <!-- CALENDAR (달력) -->
+    <section class="screen" id="screen-calendar" aria-label="달력">
+      <div class="backrow" id="calendar-back" tabindex="0" role="button" aria-label="돌아가기">← 뒤로</div>
+      <div id="calendar-content"></div>
     </section>
 
     <!-- PATTERN -->

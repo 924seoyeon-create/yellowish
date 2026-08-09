@@ -103,10 +103,30 @@ main.screens{
   padding-bottom: calc(24px + var(--safe-bottom));
 }
 
-.screen{ display:none; animation: fadeIn .25s ease; }
+.screen{ display:none; animation: fadeIn .25s ease; position: relative; }
 .screen.active{ display:block; }
 
 @keyframes fadeIn{ from{ opacity:0; transform: translateY(6px);} to{opacity:1; transform:none;} }
+
+/* ---------- Mention (기본 멘트) ---------- */
+.mention-block{
+  min-height: 46vh;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  text-align:center;
+  padding: 40px 12px;
+  opacity: 0;
+  transition: opacity .28s ease;
+}
+.mention-block.show{ opacity:1; }
+.mention-block.hide{ opacity:0; }
+.mention-text{
+  font-size: 20px;
+  font-weight: 800;
+  line-height: 1.6;
+  color: var(--text);
+}
 
 button{ font-family: inherit; }
 
@@ -209,14 +229,32 @@ button{ font-family: inherit; }
   50%{ transform: translate(-50%,0) rotate(2deg) scale(1.05); }
 }
 
-.fire-stage[data-urgency="1"] .flame{ font-size: 34px; filter: drop-shadow(0 0 3px rgba(245,158,11,0.25)); animation-duration: 3.2s; }
+.fire-stage[data-urgency="1"] .flame{ opacity: 0; font-size: 34px; filter: drop-shadow(0 0 3px rgba(245,158,11,0.25)); animation-duration: 3.2s; }
 .fire-stage[data-urgency="2"] .flame{ font-size: 36px; filter: drop-shadow(0 0 6px rgba(245,158,11,0.35)); animation-duration: 2.8s; }
 .fire-stage[data-urgency="3"] .flame{ font-size: 40px; filter: drop-shadow(0 0 10px rgba(234,88,12,0.45)); animation-duration: 2.2s; }
-.fire-stage[data-urgency="4"] .flame{ font-size: 42px; filter: drop-shadow(0 0 16px rgba(234,88,12,0.55)); animation-duration: 1.6s; }
-.fire-stage[data-urgency="5"] .flame{ font-size: 46px; filter: drop-shadow(0 0 26px rgba(220,38,38,0.7)); animation-duration: 1s; }
+.fire-stage[data-urgency="4"] .flame{ font-size: 44px; filter: drop-shadow(0 0 16px rgba(234,88,12,0.55)); animation-duration: 1.6s; }
 
 .fire-stage[data-urgency="4"]{ background: radial-gradient(circle at 50% 45%, rgba(234,88,12,0.18), transparent 60%); }
-.fire-stage[data-urgency="5"]{ background: radial-gradient(circle at 50% 45%, rgba(220,38,38,0.26), transparent 60%); }
+
+/* 긴급: 불이 foreground, 발은 발목 정도만 보이도록 아래쪽만 클리핑 (spec §6-4) */
+.fire-stage[data-urgency="4"] .foot{ clip-path: inset(58% 0 0 0); filter: brightness(0.9) saturate(1.15); }
+
+/* 매우 긴급 / 마감초과: 불 그리드로 화면을 채우는 별도 모드 (spec §6-5, §7) */
+.fire-grid-mode{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  background: radial-gradient(circle at 50% 45%, rgba(220,38,38,0.26), transparent 60%);
+}
+.flame-grid{
+  font-size: 32px;
+  line-height: 1.5;
+  text-align:center;
+  letter-spacing: 4px;
+  animation: flicker 1s ease-in-out infinite;
+  filter: drop-shadow(0 0 20px rgba(220,38,38,0.6));
+}
+.fire-grid-mode.overdue-mode .flame-grid{ animation-duration: 0.7s; }
 
 .temp-label{
   text-align:center;
@@ -266,13 +304,139 @@ button{ font-family: inherit; }
 .meta-value{ font-size: 18px; font-weight: 800; }
 .meta-value.temp{ color: var(--orange); }
 
-.other-tasks-link{
-  text-align:center;
+.home-links-row{
+  display:flex;
+  justify-content:center;
+  gap: 22px;
+  margin-top: 16px;
+}
+.home-link{
   font-size: 13px;
   color: var(--text-soft);
-  margin-top: 14px;
   cursor:pointer;
   text-decoration: underline;
+}
+
+/* ---------- Other tasks / calendar day list ---------- */
+.other-task-item{
+  display:flex;
+  gap: 12px;
+  align-items:center;
+  padding: 16px 4px;
+  border-bottom: 1px solid var(--line);
+  cursor:pointer;
+}
+.other-task-item:first-child{ border-top: 1px solid var(--line); }
+.other-task-importance{
+  font-size: 11px;
+  font-weight: 800;
+  padding: 4px 10px;
+  border-radius: 999px;
+  white-space:nowrap;
+  flex-shrink:0;
+}
+.other-task-importance.imp-high{ background: rgba(220,38,38,0.12); color: var(--red); }
+.other-task-importance.imp-medium{ background: rgba(245,158,11,0.14); color: var(--orange); }
+.other-task-importance.imp-low{ background: rgba(43,33,24,0.08); color: var(--text-soft); }
+.other-task-title{ font-size: 16px; font-weight: 700; }
+.other-task-deadline{ font-size: 12px; color: var(--text-soft); margin-top: 2px; }
+
+/* ---------- Calendar (달력) ---------- */
+.cal-header{ display:flex; align-items:center; justify-content:space-between; margin: 10px 0 14px; }
+.cal-month-label{ font-size: 17px; font-weight: 800; }
+.cal-nav{
+  background: var(--bg-card);
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  width: 34px; height: 34px;
+  font-size: 18px;
+  line-height:1;
+  cursor:pointer;
+}
+.cal-weekdays{
+  display:grid;
+  grid-template-columns: repeat(7,1fr);
+  text-align:center;
+  font-size: 12px;
+  color: var(--text-soft);
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+.cal-grid{ display:grid; grid-template-columns: repeat(7,1fr); gap: 4px; }
+.cal-cell{
+  aspect-ratio: 1;
+  border:none;
+  background: transparent;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  cursor:pointer;
+  position:relative;
+  font-family: inherit;
+}
+.cal-cell.empty{ cursor:default; }
+.cal-cell.today{ background: rgba(245,158,11,0.15); font-weight: 800; }
+.cal-cell.has-deadline{ color: var(--orange); font-weight: 800; }
+.cal-dot{
+  position:absolute;
+  bottom: 4px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 5px; height: 5px;
+  border-radius: 50%;
+  background: var(--red);
+}
+.cal-day-label{ font-weight: 800; margin: 18px 0 6px; font-size: 14px; color: var(--text-soft); }
+.cal-empty-day{ text-align:center; color: var(--text-soft); font-size: 13px; margin-top: 20px; }
+
+/* ---------- Deadline picker (add-task) ---------- */
+.deadline-picker-row{ display:flex; gap: 8px; }
+.deadline-date-btn{
+  flex:1;
+  padding: 14px 12px;
+  border-radius: 14px;
+  border: 1.5px solid var(--line);
+  background: var(--bg-card);
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+  cursor:pointer;
+  text-align:left;
+  font-family: inherit;
+}
+.field input[type=time]{
+  width: 120px;
+  padding: 14px 10px;
+  border-radius: 14px;
+  border: 1.5px solid var(--line);
+  background: var(--bg-card);
+  font-size: 15px;
+  color: var(--text);
+}
+.deadline-clear{
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--text-soft);
+  text-decoration: underline;
+  cursor:pointer;
+  width: fit-content;
+}
+
+/* ---------- Duration picker (오늘 §8) ---------- */
+.duration-card{ text-align:center; }
+.duration-title{ font-size: 17px; font-weight: 800; margin: 0 0 16px; }
+.duration-options{ display:flex; gap: 10px; margin-bottom: 16px; }
+.duration-options .btn{ padding: 14px 10px; font-size: 14px; }
+.duration-custom-row{ display:flex; align-items:center; gap: 8px; justify-content:center; margin-bottom: 14px; }
+.duration-custom-row input{
+  width: 80px;
+  padding: 12px;
+  border-radius: 12px;
+  border: 1.5px solid var(--line);
+  font-size: 16px;
+  text-align:center;
+  font-family: inherit;
 }
 
 .empty-state{
@@ -359,16 +523,25 @@ h1.screen-title{ font-size: 22px; font-weight: 800; margin: 6px 0 18px; }
   75%{ transform: rotate(-4deg); }
   100%{ transform: rotate(0); }
 }
-.burst-label{
-  font-size: 15px;
+.shrine-arrived{
+  font-size: 36px;
   font-weight: 800;
-  letter-spacing: 0.08em;
+  margin-top: 14px;
   color: var(--orange);
-  margin-top: 18px;
+  letter-spacing: 0.02em;
 }
-.burst-copy{ color: var(--text-soft); font-size: 14px; margin-top: 6px; }
-.burst-task{ font-size: 22px; font-weight: 800; margin-top: 22px; }
-.burst-duration{ font-size: 44px; font-weight: 800; margin: 14px 0 22px; letter-spacing: -0.02em; }
+.bell-big.small{ font-size: 44px; }
+.bell-big.small img{ height: 44px; }
+.shrine-question{ font-size: 17px; font-weight: 700; margin-top: 22px; }
+.shrine-answer{ font-size: 21px; font-weight: 800; margin-top: 4px; color: var(--orange); }
+.shrine-current-task{ margin-top: 18px; font-size: 14px; color: var(--text-soft); }
+.shrine-stopwatch-preview{
+  font-size: 40px;
+  font-weight: 800;
+  margin: 22px 0;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
 
 /* ---------- Focus ---------- */
 .focus-screen{ text-align:center; padding-top: 26px; }
@@ -399,6 +572,16 @@ h1.screen-title{ font-size: 22px; font-weight: 800; margin: 6px 0 18px; }
   transition: width 1s linear;
 }
 
+/* ---------- Shrine stopwatch (신내림, count-up) ---------- */
+.shrine-timer-screen .focus-time{ font-size: 54px; }
+.bell-sm{ display:inline-block; vertical-align:middle; margin-right: 4px; }
+.bell-sm img{ height: 18px; width:auto; vertical-align:middle; }
+.axe-easteregg{
+  font-size: 44px;
+  margin: 16px 0 4px;
+  animation: bellShake 0.6s ease;
+}
+
 /* ---------- Focus complete ---------- */
 .complete-screen{ text-align:center; padding-top: 34px; }
 .complete-icon{ font-size: 44px; }
@@ -406,6 +589,8 @@ h1.screen-title{ font-size: 22px; font-weight: 800; margin: 6px 0 18px; }
 .complete-headline{ font-size: 20px; font-weight: 800; margin: 14px 0 4px; }
 .complete-sub{ color: var(--text-soft); font-size: 15px; margin-bottom: 26px; line-height:1.6; }
 .complete-minutes{ font-size: 48px; font-weight: 800; margin: 6px 0; }
+.complete-axe{ font-size: 15px; font-weight: 800; color: var(--orange); margin-top: 8px; }
+.complete-memo-field{ text-align:left; margin-top: 22px; }
 
 /* ---------- Pattern ---------- */
 .pattern-grid{ display:grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 16px 0; }
