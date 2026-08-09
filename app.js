@@ -19,7 +19,7 @@
     lastCompleteInfo: null,  // info to render on focus-complete screen
     timerInterval: null,
     displayedUrgency: null,     // urgency currently shown on the home fire-stage
-    displayedFireMode: null,    // "ladder" | "grid" | "overdue"
+    displayedFireMode: null,    // "ladder" | "solo" | "overdue"
     calendarViewDate: null,
     calendarMode: "view",       // "view" | "pick"
     calendarSelectedDate: null,
@@ -31,11 +31,12 @@
   const DEFAULT_TODAY_MINUTES = 40;
   const SHRINE_AXE_MS = 3 * 60 * 60 * 1000;
 
-  // Fire always rises from the bottom of the stage toward the foot at the
-  // top. Never edit these to move the flame via `top` — see spec rule #16.
+  // Fire always rises from the bottom of the stage toward the foot, which
+  // is pinned at the vertical center of the stage. Never edit these to move
+  // the flame via `top` — see spec rule #16.
   // Level 1 sits below the visible stage (and is opacity:0 via CSS) so no
   // fire is visible at all — spec §6-1 "불은 화면에 나타나지 않는다".
-  const FLAME_BOTTOM = { 1: -15, 2: 20, 3: 42, 4: 64 };
+  const FLAME_BOTTOM = { 1: -15, 2: 12, 3: 28, 4: 44 };
 
   const URGENCY_INFO = {
     1: { temp: "여유", message: "강 건너 불구경" },
@@ -47,7 +48,7 @@
 
   const MENTIONS = {
     home: "다 울었니?<br>이제 할 일을 하자",
-    pattern: "심연을 들여다보면<br>심연도 나를 들여다본다"
+    pattern: "심연을 들여다...<br>봐야할까요?"
   };
 
   const IMPORTANCE_LABEL = { low: "낮음", medium: "보통", high: "높음" };
@@ -311,20 +312,50 @@
   // ============ RENDER: HOME (오늘) ============
   let homeTickInterval = null;
 
+  // Builds the fire visual markup for a given mode. Uses classes only (no
+  // ids) so it can be safely rendered into more than one container at once
+  // (오늘's home view and a 다른 작업 task's detail view both use this).
   function fireStageHtml(mode){
     if(mode === "overdue"){
       return `<div class="fire-stage fire-grid-mode overdue-mode" aria-hidden="true"><div class="flame-grid">🔥🔥🔥<br>🔥🦶🔥<br>🔥🔥🔥</div></div>`;
     }
-    if(mode === "grid"){
-      return `<div class="fire-stage fire-grid-mode" aria-hidden="true"><div class="flame-grid">🔥🔥🔥<br>🔥🔥🔥<br>🔥🔥🔥</div></div>`;
+    if(mode === "solo"){
+      return `<div class="fire-stage fire-solo-mode" aria-hidden="true"><div class="flame-solo">🔥</div></div>`;
     }
     return `
-      <div class="fire-stage" id="home-fire-stage" aria-hidden="true">
+      <div class="fire-stage" aria-hidden="true">
         <div class="fire-track">
-          <div class="flame" id="home-flame">🔥</div>
-          <div class="foot" id="home-foot">🦶</div>
+          <div class="flame">🔥</div>
+          <div class="foot">🦶</div>
         </div>
       </div>`;
+  }
+
+  function fireModeFor(urgency, overdue){
+    if(overdue) return "overdue";
+    if(urgency >= 5) return "solo";
+    return "ladder";
+  }
+
+  // Full (re)render of a fire-visual block: stage + temp label + caption.
+  // Used both for a mode change on 오늘's home view and for the one-shot
+  // snapshot shown on a task's detail screen (다른 작업 → 항목 클릭).
+  function renderFireVisualInto(containerEl, urgency, overdue){
+    const mode = fireModeFor(urgency, overdue);
+    const info = URGENCY_INFO[urgency];
+    const isExtreme = overdue || urgency >= 5;
+    containerEl.innerHTML = `
+      ${fireStageHtml(mode)}
+      <div class="temp-label${isExtreme?' hot':''}">${overdue ? "위험" : info.temp}</div>
+      <div class="urgency-caption${isExtreme?' hot':''}">${overdue ? "발이 불타고 있습니다." : info.message}</div>
+    `;
+    if(mode === "ladder"){
+      const stage = containerEl.querySelector(".fire-stage");
+      const flame = containerEl.querySelector(".flame");
+      if(stage) stage.setAttribute("data-urgency", String(urgency));
+      if(flame) flame.style.setProperty("--flame-bottom", FLAME_BOTTOM[urgency] + "%");
+    }
+    return mode;
   }
 
   function renderHome(){
@@ -358,9 +389,7 @@
     const others = activeTasks.length - 1;
 
     container.innerHTML = `
-      <div id="home-fire-stage-wrap"></div>
-      <div class="temp-label" id="home-temp-label"></div>
-      <div class="urgency-caption" id="home-caption"></div>
+      <div id="home-fire-visual"></div>
 
       <div class="task-title" id="home-task-title" role="button" tabindex="0">${escapeHtml(task.title)}</div>
       <div class="task-next" id="home-task-next">${task.nextAction ? escapeHtml(task.nextAction) : ""}</div>
@@ -394,39 +423,40 @@
   }
 
   // Updates the fire-stage + labels in place. When the visual "mode"
-  // (ladder vs level-5 grid vs overdue grid) hasn't changed, only the
+  // (ladder vs level-5 solo flame vs overdue grid) hasn't changed, only the
   // flame's `bottom` position and text are touched, so the CSS transition
   // on `bottom` can animate smoothly between urgency levels.
   function applyUrgencyToHome(task, urgency, overdue, opts){
     opts = opts || {};
-    const mode = overdue ? "overdue" : (urgency>=5 ? "grid" : "ladder");
+    const mode = fireModeFor(urgency, overdue);
     const modeChanged = state.displayedFireMode !== mode;
     state.displayedFireMode = mode;
     state.displayedUrgency = urgency;
     const isExtreme = overdue || urgency >= 5;
     const info = URGENCY_INFO[urgency];
 
-    const wrap = document.getElementById("home-fire-stage-wrap");
-    if(wrap && modeChanged){
-      wrap.innerHTML = fireStageHtml(mode);
-    }
-    if(mode === "ladder"){
-      const stage = document.getElementById("home-fire-stage");
-      const flame = document.getElementById("home-flame");
-      if(stage) stage.setAttribute("data-urgency", String(urgency));
-      if(flame) flame.style.setProperty("--flame-bottom", FLAME_BOTTOM[urgency] + "%");
-    }
-
-    const tempLabel = document.getElementById("home-temp-label");
-    if(tempLabel){
-      tempLabel.textContent = overdue ? "위험" : info.temp;
-      tempLabel.classList.toggle("hot", isExtreme);
-    }
-
-    const caption = document.getElementById("home-caption");
-    if(caption){
-      caption.textContent = overdue ? "발이 불타고 있습니다." : info.message;
-      caption.classList.toggle("hot", isExtreme);
+    const container = document.getElementById("home-fire-visual");
+    if(container){
+      if(modeChanged){
+        renderFireVisualInto(container, urgency, overdue);
+      }else{
+        const tempLabel = container.querySelector(".temp-label");
+        if(tempLabel){
+          tempLabel.textContent = overdue ? "위험" : info.temp;
+          tempLabel.classList.toggle("hot", isExtreme);
+        }
+        const caption = container.querySelector(".urgency-caption");
+        if(caption){
+          caption.textContent = overdue ? "발이 불타고 있습니다." : info.message;
+          caption.classList.toggle("hot", isExtreme);
+        }
+        if(mode === "ladder"){
+          const stage = container.querySelector(".fire-stage");
+          const flame = container.querySelector(".flame");
+          if(stage) stage.setAttribute("data-urgency", String(urgency));
+          if(flame) flame.style.setProperty("--flame-bottom", FLAME_BOTTOM[urgency] + "%");
+        }
+      }
     }
 
     const nextEl = document.getElementById("home-task-next");
@@ -644,8 +674,9 @@
       return;
     }
     const urgency = effectiveUrgency(t);
+    const overdue = isOverdue(t);
     container.innerHTML = `
-      <div class="detail-flame">🔥</div>
+      <div id="detail-fire-visual"></div>
       <div class="detail-title">${escapeHtml(t.title)}</div>
       ${t.nextAction ? `<div class="detail-next">${escapeHtml(t.nextAction)}</div>` : ""}
 
@@ -671,6 +702,7 @@
         </div>
       </div>
     `;
+    renderFireVisualInto(document.getElementById("detail-fire-visual"), urgency, overdue);
     document.getElementById("detail-start-btn").addEventListener("click", ()=>openDurationPicker(t.id));
     document.getElementById("detail-edit-btn").addEventListener("click", ()=>openAddTask(t.id));
     document.getElementById("detail-complete-btn").addEventListener("click", ()=>{

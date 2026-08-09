@@ -190,8 +190,9 @@ button{ font-family: inherit; }
 
 /* ---------- Fire visual ----------
    Core rule: fire ALWAYS rises from the bottom of the stage toward the
-   foot, which is pinned near the top. Position is driven by `bottom`
-   (never `top`) so it can only travel upward as urgency increases. */
+   foot, which is pinned at the stage's vertical center so the whole
+   metaphor reads as centered. Position is driven by `bottom` (never `top`)
+   so it can only travel upward as urgency increases. */
 .fire-stage{
   position: relative;
   height: 220px;
@@ -206,14 +207,14 @@ button{ font-family: inherit; }
 .foot{
   position:absolute;
   left:50%;
-  top: 10%;
-  transform: translate(-50%,0);
+  top: 50%;
+  transform: translate(-50%,-50%);
   font-size: 40px;
   transition: opacity .5s ease, transform .5s ease;
 }
 .foot.foot-hidden{
   opacity: 0;
-  transform: translate(-50%,-14px);
+  transform: translate(-50%, calc(-50% - 14px));
   pointer-events: none;
 }
 
@@ -258,6 +259,23 @@ button{ font-family: inherit; }
   filter: drop-shadow(0 0 20px rgba(220,38,38,0.6));
 }
 .fire-grid-mode.overdue-mode .flame-grid{ animation-duration: 0.7s; }
+
+/* 매우 긴급(마감초과 제외): 불 이모지 하나가 커졌다 작아지는 펄스 모션 */
+.fire-solo-mode{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  background: radial-gradient(circle at 50% 45%, rgba(220,38,38,0.26), transparent 60%);
+}
+.flame-solo{
+  font-size: 90px;
+  animation: pulseFlame 0.9s ease-in-out infinite;
+  filter: drop-shadow(0 0 30px rgba(220,38,38,0.7));
+}
+@keyframes pulseFlame{
+  0%,100%{ transform: scale(1); }
+  50%{ transform: scale(1.35); }
+}
 
 .temp-label{
   text-align:center;
@@ -518,7 +536,6 @@ button{ font-family: inherit; }
 h1.screen-title{ font-size: 22px; font-weight: 800; margin: 6px 0 18px; }
 
 /* ---------- Task detail ---------- */
-.detail-flame{ text-align:center; font-size: 38px; margin: 6px 0 2px; }
 .detail-title{ font-size: 24px; font-weight:800; text-align:center; margin: 0 0 4px; }
 .detail-next{ text-align:center; color:var(--text-soft); font-size:15px; margin-bottom: 6px;}
 .stopping-rule{ font-size: 14px; color: var(--text-soft); line-height:1.6; }
