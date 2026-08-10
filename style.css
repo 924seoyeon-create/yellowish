@@ -362,6 +362,9 @@ button{ font-family: inherit; }
 .other-task-importance.imp-low{ background: rgba(43,33,24,0.08); color: var(--text-soft); }
 .other-task-title{ font-size: 16px; font-weight: 700; }
 .other-task-deadline{ font-size: 12px; color: var(--text-soft); margin-top: 2px; }
+.other-task-done{ opacity: 0.6; }
+.other-task-done .other-task-title{ text-decoration: line-through; }
+.other-task-done .other-task-importance{ background: rgba(43,33,24,0.08); color: var(--text-soft); }
 .other-task-body{ flex: 1; min-width: 0; }
 .other-task-delete{
   flex-shrink: 0;
@@ -422,6 +425,7 @@ button{ font-family: inherit; }
   background: var(--red);
 }
 .cal-day-label{ font-weight: 800; margin: 18px 0 6px; font-size: 14px; color: var(--text-soft); }
+.cal-group-label{ font-weight: 700; margin: 14px 0 4px; font-size: 12px; color: var(--text-soft); }
 .cal-empty-day{ text-align:center; color: var(--text-soft); font-size: 13px; margin-top: 20px; }
 
 /* ---------- Deadline picker (add-task) ---------- */

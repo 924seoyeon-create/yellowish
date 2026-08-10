@@ -407,9 +407,13 @@
           <span class="bell" id="empty-guide-bell" role="button" tabindex="0"><img src="icons/sinnaerim.png" alt=""></span>
           갑자기 신내림을 받으면<br>바로 시작할 수도 있어요.
         </div>
+        <div class="home-links-row">
+          <span class="home-link" id="empty-calendar-link" role="button" tabindex="0">📅 달력</span>
+        </div>
       `;
       document.getElementById("empty-add-btn").addEventListener("click", ()=>openAddTask());
       bindActivate(document.getElementById("empty-guide-bell"), ()=>openGuide());
+      bindActivate(document.getElementById("empty-calendar-link"), ()=>openCalendar("view"));
       return;
     }
 
@@ -834,7 +838,7 @@
     const todayKey = dateKey(new Date());
 
     const deadlineDates = {};
-    getActiveTasks().forEach(t=>{
+    state.tasks.forEach(t=>{
       if(t.deadline){
         const k = dateKey(new Date(t.deadline));
         deadlineDates[k] = (deadlineDates[k]||0) + 1;
@@ -883,21 +887,32 @@
       return;
     }
     state.calendarSelectedDate = key;
-    const tasksOnDate = getActiveTasks().filter(t => t.deadline && dateKey(new Date(t.deadline)) === key);
+    const tasksOnDate = state.tasks.filter(t => t.deadline && dateKey(new Date(t.deadline)) === key);
     const listEl = document.getElementById("cal-selected-tasks");
     if(!listEl) return;
     if(tasksOnDate.length===0){
       listEl.innerHTML = `<div class="cal-empty-day">${key} 마감인 작업이 없습니다.</div>`;
       return;
     }
-    listEl.innerHTML = `<div class="cal-day-label">${key}</div>` + tasksOnDate.map(t=>`
-      <div class="other-task-item" data-id="${t.id}" role="button" tabindex="0">
-        <div class="other-task-importance imp-${t.importance}">${IMPORTANCE_LABEL[t.importance]}</div>
+
+    const todoTasks = tasksOnDate.filter(t => t.status === "active");
+    const doneTasks = tasksOnDate.filter(t => t.status === "completed");
+
+    function taskItemHtml(t, done){
+      return `
+      <div class="other-task-item${done ? " other-task-done" : ""}" data-id="${t.id}" role="button" tabindex="0">
+        <div class="other-task-importance imp-${t.importance}">${done ? "✓" : IMPORTANCE_LABEL[t.importance]}</div>
         <div class="other-task-body">
           <div class="other-task-title">${escapeHtml(t.title)}</div>
           <div class="other-task-deadline">${formatDeadline(t.deadline)}</div>
         </div>
-      </div>`).join("");
+      </div>`;
+    }
+
+    listEl.innerHTML = `<div class="cal-day-label">${key}</div>`
+      + (todoTasks.length ? `<div class="cal-group-label">해야 할 작업</div>${todoTasks.map(t=>taskItemHtml(t,false)).join("")}` : "")
+      + (doneTasks.length ? `<div class="cal-group-label">완료한 작업</div>${doneTasks.map(t=>taskItemHtml(t,true)).join("")}` : "");
+
     listEl.querySelectorAll(".other-task-item").forEach(el=>{
       bindActivate(el, ()=> openTaskDetail(el.dataset.id));
     });
