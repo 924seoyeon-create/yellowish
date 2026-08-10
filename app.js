@@ -6,7 +6,9 @@
     tasks: "noreut_tasks",
     sessions: "noreut_sessions",
     focus: "noreut_current_focus",
-    seeded: "noreut_seeded"
+    seeded: "noreut_seeded",
+    todayGuideSeen: "noreut_today_guide_seen",
+    shrineGuideSeen: "noreut_shrine_guide_seen"
   };
 
   const state = {
@@ -47,9 +49,44 @@
   };
 
   const MENTIONS = {
-    home: "다 울었니?<br>이제 할 일을 하자",
-    pattern: "심연을 들여다...<br>봐야할까요?"
+    home: "다 울었니?<br>이제 할 일을 하자"
   };
+
+  // 첫 방문(또는 "ⓘ 사용법") 때만 보여주는 목적+방법 안내. 이후엔 기본 멘트만 재생된다.
+  const TODAY_GUIDE_STAGES = [
+    { html: "지금 해야 할 일을<br>찾는 곳", holdMs: 1100 },
+    { html: "가장 가까이 온<br>불부터 보세요.", holdMs: 1100 }
+  ];
+  const SHRINE_GUIDE_STAGES = [
+    { html: "집중할 수 있는 순간을<br>바로 써보는 곳.", holdMs: 1100 },
+    { html: "집중이 오면 스톱워치를 켜고,<br>끝나면 기록하세요.", holdMs: 1100 }
+  ];
+  // 오늘 페이지는 행동으로의 전환 속도를 우선하므로 멘트 노출을 짧게 유지한다.
+  const TODAY_MENTION_HOLD_MS = 750; // 기존 1500ms 대비 50% 단축
+  const SHRINE_ARRIVED_HOLD_MS = 750;
+
+  const PATTERN_MENTION_STAGES = [
+    { html: "심연을 바라보면", holdMs: 900 },
+    { html: "심연도 나를 바라본다.", holdMs: 900 },
+    { html: "맞짝사랑이다.", holdMs: 1300, gapBefore: 500 }
+  ];
+
+  const LOCATION_OPTIONS = [
+    { emoji: "🏠", label: "집" },
+    { emoji: "☕", label: "카페" },
+    { emoji: "📚", label: "도서관" },
+    { emoji: "🏢", label: "회사/학교" },
+    { emoji: "🚶", label: "이동 중" },
+    { emoji: "🌳", label: "야외" }
+  ];
+  const TRIGGER_OPTIONS = [
+    { emoji: "💡", label: "아이디어가 떠올라서" },
+    { emoji: "🔥", label: "마감 때문에" },
+    { emoji: "✨", label: "갑자기 하고 싶어서" },
+    { emoji: "🧠", label: "해야 할 일이 생각나서" },
+    { emoji: "👤", label: "누군가에게 요청받아서" },
+    { emoji: "🔄", label: "하던 일이 이어져서" }
+  ];
 
   const IMPORTANCE_LABEL = { low: "낮음", medium: "보통", high: "높음" };
 
@@ -261,29 +298,58 @@
   }
 
   // ============ MENTION (기본 멘트) ============
-  // Shows a short mention line in place of a screen's content container,
-  // then fades it out and hands off to renderFn. Spec requires every entry
-  // into 오늘/신내림/패턴 to lead with its mention before the real content.
-  const MENTION_HOLD_MS = 1500;
-  const MENTION_FADE_MS = 320;
+  // Plays a sequence of short mention stages in place of a screen's content
+  // container, then hands off to renderFn. Each stage is {html, holdMs,
+  // gapBefore?} — gapBefore inserts a blank pause before that stage fades
+  // in (used for the comedic beat before 패턴's "맞짝사랑이다.").
+  const MENTION_FADE_MS = 260;
 
-  function showMentionThen(containerEl, text, renderFn){
-    if(reducedMotion()){ renderFn(); return; }
-    containerEl.innerHTML = `<div class="mention-block"><div class="mention-text">${text}</div></div>`;
-    const block = containerEl.querySelector(".mention-block");
-    requestAnimationFrame(()=> block.classList.add("show"));
-    setTimeout(()=>{
-      block.classList.add("hide");
-      setTimeout(renderFn, MENTION_FADE_MS);
-    }, MENTION_HOLD_MS);
+  // Token guard: if a screen is re-entered while a previous sequence on the
+  // same container is still mid-flight (fast tab switching), the stale
+  // chain's callbacks become no-ops instead of racing the newer one.
+  let mentionSequenceToken = 0;
+
+  function playMentionSequence(containerEl, stages, renderFn){
+    const myToken = ++mentionSequenceToken;
+    if(reducedMotion() || stages.length === 0){ renderFn(); return; }
+    let i = 0;
+    function showStage(){
+      if(myToken !== mentionSequenceToken) return;
+      const stage = stages[i];
+      setTimeout(()=>{
+        if(myToken !== mentionSequenceToken) return;
+        containerEl.innerHTML = `<div class="mention-block"><div class="mention-text">${stage.html}</div></div>`;
+        const block = containerEl.querySelector(".mention-block");
+        requestAnimationFrame(()=> block.classList.add("show"));
+        setTimeout(()=>{
+          if(myToken !== mentionSequenceToken) return;
+          block.classList.add("hide");
+          setTimeout(()=>{
+            if(myToken !== mentionSequenceToken) return;
+            i++;
+            if(i < stages.length) showStage();
+            else renderFn();
+          }, MENTION_FADE_MS);
+        }, stage.holdMs);
+      }, stage.gapBefore || 0);
+    }
+    showStage();
   }
 
-  function enterHome(){
-    showMentionThen(document.getElementById("home-content"), MENTIONS.home, renderHome);
+  function runTodayIntro(forceGuide){
+    const el = document.getElementById("home-content");
+    const seenGuide = localStorage.getItem(STORAGE_KEYS.todayGuideSeen);
+    const showGuide = forceGuide || !seenGuide;
+    if(!seenGuide) localStorage.setItem(STORAGE_KEYS.todayGuideSeen, "1");
+    const stages = (showGuide ? TODAY_GUIDE_STAGES : []).concat([{ html: MENTIONS.home, holdMs: TODAY_MENTION_HOLD_MS }]);
+    playMentionSequence(el, stages, renderHome);
   }
+
+  function enterHome(){ runTodayIntro(false); }
+  function replayTodayGuide(){ runTodayIntro(true); }
 
   function enterPattern(){
-    showMentionThen(document.getElementById("pattern-content"), MENTIONS.pattern, renderPatterns);
+    playMentionSequence(document.getElementById("pattern-content"), PATTERN_MENTION_STAGES, renderPatterns);
   }
 
   // ============ NAVIGATION ============
@@ -404,6 +470,7 @@
       <div class="home-links-row">
         <span class="home-link" id="home-calendar-link" role="button" tabindex="0">📅 달력</span>
         ${others > 0 ? `<span class="home-link" id="home-others-link" role="button" tabindex="0">다른 작업 ${others}개</span>` : ""}
+        <span class="home-link" id="home-guide-link" role="button" tabindex="0">ⓘ 사용법</span>
       </div>
     `;
 
@@ -412,6 +479,7 @@
     document.getElementById("home-task-title").addEventListener("keypress", e=>{ if(e.key==="Enter") openTaskDetail(task.id); });
     bindActivate(document.getElementById("home-calendar-link"), ()=>openCalendar("view"));
     bindActivate(document.getElementById("home-others-link"), ()=>openOtherTasks());
+    bindActivate(document.getElementById("home-guide-link"), ()=>replayTodayGuide());
 
     applyUrgencyToHome(task, urgency, overdue, { skipTransition: true });
 
@@ -575,17 +643,27 @@
     const h = date.getHours();
     const ampm = h < 12 ? "AM" : "PM";
     let h12 = h % 12; if(h12===0) h12 = 12;
-    const minute = String(Math.round(date.getMinutes()/5)*5 % 60).padStart(2,"0");
     document.getElementById("f-deadline-ampm").value = ampm;
     document.getElementById("f-deadline-hour").value = String(h12);
-    document.getElementById("f-deadline-minute").value = minute;
+    document.getElementById("f-deadline-minute").value = String(date.getMinutes()).padStart(2,"0");
   }
 
   function resetDeadlineTimeSelects(){
     document.getElementById("f-deadline-ampm").value = "PM";
     document.getElementById("f-deadline-hour").value = "11";
-    document.getElementById("f-deadline-minute").value = "55";
+    document.getElementById("f-deadline-minute").value = "59";
   }
+
+  // 마감 분(分) 선택은 1분 단위까지 지정 가능해야 하므로 60개 옵션을 동적으로 채운다.
+  (function populateMinuteOptions(){
+    const sel = document.getElementById("f-deadline-minute");
+    let html = "";
+    for(let m=0; m<60; m++){
+      const v = String(m).padStart(2,"0");
+      html += `<option value="${v}">${v}분</option>`;
+    }
+    sel.innerHTML = html;
+  })();
 
   function openAddTask(editId){
     state.editTaskId = editId || null;
@@ -881,33 +959,48 @@
 
   // ============ SHRINE (신내림) ============
   // Not a countdown. 왔다 → 바로 시작 가능한 count-up 스톱워치. See §9-14.
-  function openShrine(){
+  function runShrineIntro(forceGuide){
     showScreen("shrine");
     playBellSound();
     const container = document.getElementById("shrine-content");
-    container.innerHTML = `
-      <span class="bell-big"><img src="icons/sinnaerim.png" alt=""></span>
-      <div class="shrine-arrived">왔다</div>
-    `;
+    const seenGuide = localStorage.getItem(STORAGE_KEYS.shrineGuideSeen);
+    const showGuide = forceGuide || !seenGuide;
+    if(!seenGuide) localStorage.setItem(STORAGE_KEYS.shrineGuideSeen, "1");
 
-    const delay = reducedMotion() ? 0 : MENTION_HOLD_MS;
-    setTimeout(renderShrineReady, delay);
+    function showArrived(){
+      container.innerHTML = `
+        <span class="bell-big"><img src="icons/sinnaerim.png" alt=""></span>
+        <div class="shrine-arrived">왔다</div>
+      `;
+      setTimeout(renderShrineReady, reducedMotion() ? 0 : SHRINE_ARRIVED_HOLD_MS);
+    }
+
+    if(showGuide){
+      playMentionSequence(container, SHRINE_GUIDE_STAGES, showArrived);
+    }else{
+      showArrived();
+    }
   }
+
+  function openShrine(){ runShrineIntro(false); }
+  function replayShrineGuide(){ runShrineIntro(true); }
 
   function renderShrineReady(){
     const container = document.getElementById("shrine-content");
     const task = selectShrineTask();
     container.innerHTML = `
       <span class="bell-big small"><img src="icons/sinnaerim.png" alt=""></span>
-      <div class="shrine-question">지금의 내가</div>
-      <div class="shrine-answer">미래의 나를 구한다</div>
+      <div class="shrine-question">집중할 수 있는 순간이 왔어?</div>
+      <div class="shrine-answer">그럼 지금 써.</div>
       ${task ? `<div class="shrine-current-task">지금: ${escapeHtml(task.title)}</div>` : ""}
       <div class="shrine-stopwatch-preview">00:00:00</div>
       <button type="button" class="btn btn-primary" id="shrine-start-btn">시작</button>
+      <div class="home-link" id="shrine-guide-link" role="button" tabindex="0" style="margin-top:18px;">ⓘ 사용법</div>
     `;
     document.getElementById("shrine-start-btn").addEventListener("click", ()=>{
       startShrineStopwatch(task ? task.id : null);
     });
+    bindActivate(document.getElementById("shrine-guide-link"), ()=>replayShrineGuide());
   }
 
   function startShrineStopwatch(taskId){
@@ -1081,6 +1174,9 @@
       startedAt: new Date(focus.startedAt).toISOString(),
       endedAt: new Date().toISOString(),
       notes: "",
+      activity: "",
+      location: "",
+      trigger: "",
       interrupted
     };
     state.focusSessions.push(session);
@@ -1107,28 +1203,107 @@
     showScreen("focus-complete");
   }
 
+  function chipGroupHtml(groupId, options){
+    return `<div class="chip-group" id="${groupId}">
+      ${options.map(o=>`<button type="button" class="chip-option" data-value="${escapeHtml(o.label)}">${o.emoji} ${escapeHtml(o.label)}</button>`).join("")}
+      <button type="button" class="chip-option" data-value="__custom__">✏️ 직접 입력</button>
+    </div>`;
+  }
+
+  function setupChipGroup(groupId, customInputId){
+    const group = document.getElementById(groupId);
+    const customInput = document.getElementById(customInputId);
+    group.querySelectorAll(".chip-option").forEach(btn=>{
+      btn.addEventListener("click", ()=>{
+        group.querySelectorAll(".chip-option").forEach(b=>b.classList.remove("selected"));
+        btn.classList.add("selected");
+        const isCustom = btn.dataset.value === "__custom__";
+        customInput.hidden = !isCustom;
+        if(isCustom) customInput.focus();
+      });
+    });
+  }
+
+  function getSelectedChipValue(groupId, customInputId){
+    const selected = document.getElementById(groupId).querySelector(".chip-option.selected");
+    if(!selected) return "";
+    if(selected.dataset.value === "__custom__") return document.getElementById(customInputId).value.trim();
+    return selected.dataset.value;
+  }
+
+  // 신내림 종료 후 "나는 어떤 조건에서 집중이 찾아오는가?"를 나중에 발견하기 위한
+  // 짧은 기록 화면. 무엇을/어디서/왜는 session에 저장되어 패턴 분석에 쓰인다.
+  function renderDivineLogForm(session, overThreeHours){
+    const container = document.getElementById("complete-content");
+    const linkedTask = session.taskId ? state.tasks.find(t=>t.id===session.taskId) : null;
+    const activeTasks = getActiveTasks();
+
+    container.innerHTML = `
+      <div class="complete-icon"><img src="icons/sinnaerim.png" alt=""></div>
+      <div class="complete-headline">신내림 종료</div>
+      <div class="complete-minutes">${formatSessionDuration(session)}</div>
+      ${overThreeHours ? `<div class="complete-axe">🪓 3시간 넘게 몰입했습니다.</div>` : ""}
+      <div class="complete-sub">잘 탔습니다.</div>
+
+      <div class="field">
+        <label>무엇을 했나요?</label>
+        <select id="log-activity-select">
+          ${activeTasks.map(t=>`<option value="${t.id}" ${linkedTask && linkedTask.id===t.id ? "selected" : ""}>${escapeHtml(t.title)}</option>`).join("")}
+          <option value="__custom__" ${!linkedTask ? "selected" : ""}>직접 입력</option>
+        </select>
+        <input type="text" id="log-activity-custom" placeholder="무엇을 했나요?" autocomplete="off" ${linkedTask ? "hidden" : ""}>
+      </div>
+
+      <div class="field">
+        <label>어디에서?</label>
+        ${chipGroupHtml("log-location-group", LOCATION_OPTIONS)}
+        <input type="text" id="log-location-custom" placeholder="장소" autocomplete="off" hidden>
+      </div>
+
+      <div class="field">
+        <label>무엇 때문에 시작했나요?</label>
+        ${chipGroupHtml("log-trigger-group", TRIGGER_OPTIONS)}
+        <input type="text" id="log-trigger-custom" placeholder="계기" autocomplete="off" hidden>
+      </div>
+
+      <div class="stack">
+        <button class="btn btn-primary" id="complete-log-btn">기록하기</button>
+      </div>
+      <div class="skip-link" id="complete-skip-link">건너뛰고 끝내기</div>
+    `;
+
+    const activitySelect = document.getElementById("log-activity-select");
+    const activityCustom = document.getElementById("log-activity-custom");
+    activitySelect.addEventListener("change", ()=>{
+      activityCustom.hidden = activitySelect.value !== "__custom__";
+      if(activitySelect.value === "__custom__") activityCustom.focus();
+    });
+    setupChipGroup("log-location-group", "log-location-custom");
+    setupChipGroup("log-trigger-group", "log-trigger-custom");
+
+    document.getElementById("complete-log-btn").addEventListener("click", ()=>{
+      session.activity = activitySelect.value === "__custom__"
+        ? activityCustom.value.trim()
+        : (state.tasks.find(t=>t.id===activitySelect.value) || {}).title || "";
+      session.location = getSelectedChipValue("log-location-group", "log-location-custom");
+      session.trigger = getSelectedChipValue("log-trigger-group", "log-trigger-custom");
+      saveSessions();
+      showScreen("home");
+      showToast("기록했습니다. 🔔", { autoCloseMs: 1200 });
+    });
+    document.getElementById("complete-skip-link").addEventListener("click", ()=>showScreen("home"));
+  }
+
   function renderFocusComplete(){
     const { session, interrupted } = state.lastCompleteInfo;
     const container = document.getElementById("complete-content");
 
     if(session.mode === "divine"){
-      const overThreeHours = session.durationSeconds*1000 >= SHRINE_AXE_MS;
-      container.innerHTML = `
-        <div class="complete-icon"><img src="icons/sinnaerim.png" alt=""></div>
-        <div class="complete-headline">신내림 종료</div>
-        <div class="complete-minutes">${formatSessionDuration(session)}</div>
-        ${overThreeHours ? `<div class="complete-axe">🪓 3시간 넘게 몰입했습니다.</div>` : ""}
-        <div class="complete-sub">동안 실제로 작업했습니다.<br><br>잘했습니다.<br>여기서 멈춰도 됩니다.</div>
-        <div class="field complete-memo-field">
-          <label for="complete-memo">무엇을 하셨나요? <span style="opacity:.6;font-weight:400;">(선택)</span></label>
-          <input type="text" id="complete-memo" placeholder="메모 (선택사항)" autocomplete="off">
-        </div>
-        <div class="stack">
-          <button class="btn btn-primary" id="complete-again-btn">한 번 더</button>
-          <button class="btn btn-secondary" id="complete-done-btn">오늘은 끝</button>
-        </div>
-      `;
-    }else if(!interrupted){
+      renderDivineLogForm(session, session.durationSeconds*1000 >= SHRINE_AXE_MS);
+      return;
+    }
+
+    if(!interrupted){
       container.innerHTML = `
         <div class="complete-icon">🔥</div>
         <div class="complete-headline">지금 시작 종료</div>
@@ -1152,25 +1327,12 @@
       `;
     }
 
-    const memoInput = document.getElementById("complete-memo");
-    const saveMemo = ()=>{
-      if(memoInput && memoInput.value.trim()){
-        session.notes = memoInput.value.trim();
-        saveSessions();
-      }
-    };
-
     document.getElementById("complete-again-btn").addEventListener("click", ()=>{
-      saveMemo();
-      if(session.mode === "divine"){ openShrine(); return; }
       const task = state.tasks.find(t=>t.id===session.taskId);
       if(!task){ showScreen("home"); return; }
       openDurationPicker(task.id);
     });
-    document.getElementById("complete-done-btn").addEventListener("click", ()=>{
-      saveMemo();
-      showScreen("home");
-    });
+    document.getElementById("complete-done-btn").addEventListener("click", ()=>showScreen("home"));
   }
 
   // recover an in-progress focus session after refresh
@@ -1228,6 +1390,7 @@
     const bestHourLabel = computeBestHourRange(weekSessions);
     const topCatalyst = computeTopCatalyst(weekSessions);
     const overexertionTask = computeOverexertionTask();
+    const divineSectionHtml = renderDivinePatternSection(allDivine);
 
     container.innerHTML = `
       <h1 class="screen-title">나의 작업 패턴</h1>
@@ -1255,6 +1418,7 @@
       ${longestDivine ? `<div class="pattern-insight-row"><span class="label">가장 긴 신내림</span><span class="value">${formatSessionDuration(longestDivine)}</span></div>` : ""}
       ${overThreeHourCount>0 ? `<div class="pattern-insight-row"><span class="label">3시간 이상 몰입</span><span class="value">🪓 ${overThreeHourCount}회</span></div>` : ""}
       ${overexertionTask ? `<div class="pattern-insight-row"><span class="label">과몰입이 잦은 작업</span><span class="value">${escapeHtml(overexertionTask)}</span></div>` : ""}
+      ${divineSectionHtml}
       <div class="reset-link" id="reset-data-link">데이터 초기화</div>
     `;
     document.getElementById("reset-data-link").addEventListener("click", ()=>{
@@ -1266,6 +1430,168 @@
         location.reload();
       }
     });
+  }
+
+  // ---- 나의 신내림: 시간대/장소/계기별 분석 ----
+  function generalPeriodWord(hour){
+    if(hour < 5) return "새벽";
+    if(hour < 12) return "오전";
+    if(hour < 18) return "오후";
+    if(hour < 22) return "저녁";
+    return "심야";
+  }
+
+  function formatHourRangeKorean(start, end){
+    function part(h){
+      const hh = ((h % 24) + 24) % 24;
+      const period = hh < 12 ? "오전" : "오후";
+      let h12 = hh % 12; if(h12===0) h12 = 12;
+      return { period, h12 };
+    }
+    const s = part(start), e = part(end);
+    if(s.period === e.period) return `${s.period} ${s.h12}~${e.h12}시`;
+    return `${s.period} ${s.h12}시~${e.period} ${e.h12}시`;
+  }
+
+  function topGroup(items, keyFn){
+    const counts = {};
+    items.forEach(it=>{
+      const k = keyFn(it);
+      if(!k) return;
+      counts[k] = (counts[k]||0)+1;
+    });
+    let bestKey = null;
+    Object.keys(counts).forEach(k=>{ if(bestKey===null || counts[k] > counts[bestKey]) bestKey = k; });
+    if(bestKey===null) return null;
+    return { key: bestKey, count: counts[bestKey] };
+  }
+
+  function fourHourBucketStart(iso){ return Math.floor(new Date(iso).getHours()/4)*4; }
+
+  function computeDivineTimeInsight(divineSessions){
+    if(divineSessions.length < 3) return null;
+    const top = topGroup(divineSessions, s => String(fourHourBucketStart(s.startedAt)));
+    if(!top) return null;
+    const start = Number(top.key);
+    return { label: formatHourRangeKorean(start, start+4), startHour: start, count: top.count, total: divineSessions.length };
+  }
+
+  function computeDivineFieldInsight(divineSessions, field){
+    const withField = divineSessions.filter(s=>s[field]);
+    if(withField.length < 3) return null;
+    const top = topGroup(withField, s=>s[field]);
+    if(!top) return null;
+    return { label: top.key, count: top.count, total: withField.length };
+  }
+
+  function patternBarRowHtml(title, desc, count, total){
+    const pct = total>0 ? Math.round((count/total)*100) : 0;
+    return `
+      <div class="pattern-bar-row">
+        <div class="pattern-bar-top">
+          <span class="pattern-bar-label">${title}</span>
+          <span class="pattern-bar-desc">${escapeHtml(desc)}</span>
+        </div>
+        <div class="pattern-bar-track"><div class="pattern-bar-fill" style="width:${pct}%"></div></div>
+        <div class="pattern-bar-count">${count}회</div>
+      </div>`;
+  }
+
+  function insightSentenceTimeOfDay(info){
+    if(!info || info.count < 3 || info.count < Math.ceil(info.total*0.4)) return null;
+    return `당신의 신내림은 ${generalPeriodWord(info.startHour)}에 자주 찾아오는 편입니다.<br>최근 신내림 ${info.total}회 중 ${info.count}회가 ${info.label}에 시작됐습니다.`;
+  }
+
+  function insightSentenceByField(divineSessions, field, fieldLabel){
+    const withField = divineSessions.filter(s=>s[field]);
+    const groups = {};
+    withField.forEach(s=>{ (groups[s[field]] = groups[s[field]]||[]).push(s.actualDuration); });
+    const keys = Object.keys(groups).filter(k=>groups[k].length>=3);
+    if(keys.length===0) return null;
+    let best=null, bestAvg=-1;
+    keys.forEach(k=>{
+      const avg = groups[k].reduce((a,b)=>a+b,0)/groups[k].length;
+      if(avg>bestAvg){ bestAvg=avg; best=k; }
+    });
+    if(!best) return null;
+    const others = withField.filter(s=>s[field]!==best).map(s=>s.actualDuration);
+    if(field==="location"){
+      if(others.length===0) return null;
+      const othersAvg = others.reduce((a,b)=>a+b,0)/others.length;
+      const diff = Math.round(bestAvg - othersAvg);
+      if(diff < 5) return null;
+      return `${escapeHtml(best)}에서 집중이 오래 지속되는 편입니다.<br>다른 곳보다 ${escapeHtml(best)}에서 평균 ${diff}분 더 오래 집중했습니다.`;
+    }
+    return `${escapeHtml(best)} 시작했을 때 집중 시간이 길어지는 편입니다.<br>이 계기였던 신내림의 평균 집중 시간은 ${Math.round(bestAvg)}분입니다.`;
+  }
+
+  function computeDivineCombo(divineSessions){
+    const withBoth = divineSessions.filter(s=>s.location && s.trigger);
+    if(withBoth.length < 6) return null;
+    const groups = {};
+    withBoth.forEach(s=>{
+      const start = fourHourBucketStart(s.startedAt);
+      const key = `${formatHourRangeKorean(start,start+4)}|${s.location}|${s.trigger}`;
+      groups[key] = (groups[key]||0)+1;
+    });
+    let bestKey = null;
+    Object.keys(groups).forEach(k=>{ if(bestKey===null || groups[k]>groups[bestKey]) bestKey = k; });
+    if(bestKey===null) return null;
+    const count = groups[bestKey];
+    if(count < Math.ceil(withBoth.length*0.5)) return null;
+    const [timeLabel, loc, trig] = bestKey.split("|");
+    return { timeLabel, location: loc, trigger: trig, count, total: withBoth.length };
+  }
+
+  function comboCardHtml(combo){
+    return `
+      <div class="combo-card">
+        <div class="combo-title">🔔 신내림 패턴 발견</div>
+        <div class="combo-sub">당신에게 집중이 찾아오는 순간은<br>이런 조건과 관련이 있어 보입니다.</div>
+        <div class="combo-conditions">
+          <span class="combo-chip">${escapeHtml(combo.location)}</span>
+          <span class="combo-plus">+</span>
+          <span class="combo-chip">${escapeHtml(combo.timeLabel)}</span>
+          <span class="combo-plus">+</span>
+          <span class="combo-chip">${escapeHtml(combo.trigger)}</span>
+        </div>
+        <div class="combo-result">이 조건에서 최근 ${combo.total}번 중<br>${combo.count}번 집중을 시작했습니다.</div>
+      </div>`;
+  }
+
+  // 데이터가 부족하면 항목별로 조용히 생략된다 (§12: 사용자를 단정하지 않는다).
+  function renderDivinePatternSection(allDivine){
+    if(allDivine.length < 3) return "";
+
+    const timeInfo = computeDivineTimeInsight(allDivine);
+    const locInfo = computeDivineFieldInsight(allDivine, "location");
+    const trigInfo = computeDivineFieldInsight(allDivine, "trigger");
+    const avgDuration = Math.round(allDivine.reduce((sum,s)=>sum+s.actualDuration,0)/allDivine.length);
+
+    const bars = [
+      timeInfo ? patternBarRowHtml("언제?", timeInfo.label, timeInfo.count, timeInfo.total) : "",
+      locInfo ? patternBarRowHtml("어디서?", locInfo.label, locInfo.count, locInfo.total) : "",
+      trigInfo ? patternBarRowHtml("무엇 때문에?", trigInfo.label, trigInfo.count, trigInfo.total) : ""
+    ].join("");
+
+    const sentences = [
+      insightSentenceTimeOfDay(timeInfo),
+      insightSentenceByField(allDivine, "location", "장소"),
+      insightSentenceByField(allDivine, "trigger", "계기")
+    ].filter(Boolean);
+
+    const combo = computeDivineCombo(allDivine);
+
+    if(!bars && sentences.length===0 && !combo) return "";
+
+    return `
+      <div class="divider"></div>
+      <h2 class="pattern-section-title">🔔 나의 신내림</h2>
+      ${bars}
+      <div class="pattern-insight-row"><span class="label">평균 집중 시간</span><span class="value">${avgDuration}분</span></div>
+      ${sentences.length ? `<div class="pattern-insights">${sentences.map(s=>`<p class="pattern-insight-sentence">${s}</p>`).join("")}</div>` : ""}
+      ${combo ? comboCardHtml(combo) : ""}
+    `;
   }
 
   function computeBestHourRange(sessions){

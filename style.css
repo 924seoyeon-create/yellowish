@@ -624,7 +624,46 @@ h1.screen-title{ font-size: 22px; font-weight: 800; margin: 6px 0 18px; }
 .complete-sub{ color: var(--text-soft); font-size: 15px; margin-bottom: 26px; line-height:1.6; }
 .complete-minutes{ font-size: 48px; font-weight: 800; margin: 6px 0; }
 .complete-axe{ font-size: 15px; font-weight: 800; color: var(--orange); margin-top: 8px; }
-.complete-memo-field{ text-align:left; margin-top: 22px; }
+.complete-screen .field{ text-align:left; margin-top: 22px; }
+.complete-screen select{
+  width:100%;
+  padding: 14px 16px;
+  border-radius: 14px;
+  border: 1.5px solid var(--line);
+  background: var(--bg-card);
+  font-size: 16px;
+  color: var(--text);
+  font-family: inherit;
+}
+.complete-screen .field input[type=text]{ margin-top: 8px; }
+.skip-link{
+  text-align:center;
+  margin-top: 16px;
+  font-size: 13px;
+  color: var(--text-soft);
+  text-decoration: underline;
+  cursor:pointer;
+}
+
+/* ---------- Chip groups (신내림 기록: 어디에서 / 무엇 때문에) ---------- */
+.chip-group{ display:flex; flex-wrap:wrap; gap: 8px; }
+.chip-option{
+  padding: 10px 14px;
+  border-radius: 999px;
+  border: 1.5px solid var(--line);
+  background: var(--bg-card);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-soft);
+  cursor:pointer;
+  font-family: inherit;
+}
+.chip-option.selected{
+  border-color: var(--orange);
+  background: rgba(245,158,11,0.14);
+  color: var(--text);
+  font-weight: 700;
+}
 
 /* ---------- Pattern ---------- */
 .pattern-grid{ display:grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 16px 0; }
@@ -645,6 +684,50 @@ h1.screen-title{ font-size: 22px; font-weight: 800; margin: 6px 0 18px; }
 }
 .pattern-insight-row .label{ font-size: 13px; color: var(--text-soft); font-weight:700; }
 .pattern-insight-row .value{ font-size: 15px; font-weight: 800; text-align:right; }
+
+.pattern-section-title{ font-size: 17px; font-weight: 800; margin: 4px 0 16px; }
+.pattern-bar-row{ margin-bottom: 16px; }
+.pattern-bar-top{ display:flex; justify-content:space-between; align-items:baseline; margin-bottom: 6px; }
+.pattern-bar-label{ font-size: 12px; color: var(--text-soft); font-weight: 700; }
+.pattern-bar-desc{ font-size: 14px; font-weight: 800; }
+.pattern-bar-track{ height: 10px; border-radius: 999px; background: rgba(43,33,24,0.08); overflow:hidden; }
+.pattern-bar-fill{ height:100%; border-radius: 999px; background: linear-gradient(90deg, var(--amber), var(--orange)); }
+.pattern-bar-count{ font-size: 12px; color: var(--text-soft); margin-top: 4px; text-align:right; }
+
+.pattern-insights{ margin-top: 8px; }
+.pattern-insight-sentence{
+  font-size: 14px;
+  line-height: 1.7;
+  color: var(--text);
+  background: var(--bg-card);
+  border-radius: 14px;
+  padding: 14px 16px;
+  margin: 0 0 10px;
+  border: 1px solid var(--line);
+}
+
+.combo-card{
+  margin-top: 6px;
+  padding: 20px;
+  border-radius: 18px;
+  background: linear-gradient(180deg, rgba(245,158,11,0.10), rgba(220,38,38,0.06));
+  border: 1px solid var(--line);
+  text-align:center;
+}
+.combo-title{ font-size: 15px; font-weight: 800; color: var(--orange); }
+.combo-sub{ font-size: 13px; color: var(--text-soft); margin-top: 6px; line-height:1.6; }
+.combo-conditions{ display:flex; align-items:center; justify-content:center; gap: 8px; flex-wrap:wrap; margin: 16px 0; }
+.combo-chip{
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: var(--bg-card);
+  border: 1.5px solid var(--line);
+  font-size: 13px;
+  font-weight: 700;
+}
+.combo-plus{ color: var(--text-soft); font-weight: 800; }
+.combo-result{ font-size: 14px; font-weight: 700; line-height:1.6; }
+
 .reset-link{
   text-align:center;
   margin-top: 30px;
