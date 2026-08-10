@@ -121,6 +121,7 @@ main.screens{
   padding: 40px 12px;
   opacity: 0;
   transition: opacity .28s ease;
+  cursor: pointer;
 }
 .mention-block.show{ opacity:1; }
 .mention-block.hide{ opacity:0; }
@@ -533,6 +534,19 @@ button{ font-family: inherit; }
   background: rgba(245,158,11,0.12);
   color: var(--text);
 }
+
+/* 긴급 라디오: 불과 발이 실제로 겹쳐 보이도록 겹쳐서 배치 */
+.urgency-icon-overlap{
+  position: relative;
+  display: inline-block;
+  width: 1.5em;
+  height: 1em;
+  vertical-align: middle;
+}
+.urgency-icon-overlap .oi-foot,
+.urgency-icon-overlap .oi-fire{ position:absolute; top:0; left:0; }
+.urgency-icon-overlap .oi-fire{ left: 0.35em; }
+
 h1.screen-title{ font-size: 22px; font-weight: 800; margin: 6px 0 18px; }
 
 /* ---------- Task detail ---------- */
@@ -569,6 +583,11 @@ h1.screen-title{ font-size: 22px; font-weight: 800; margin: 6px 0 18px; }
 .shrine-question{ font-size: 17px; font-weight: 700; margin-top: 22px; }
 .shrine-answer{ font-size: 21px; font-weight: 800; margin-top: 4px; color: var(--orange); }
 .shrine-current-task{ margin-top: 18px; font-size: 14px; color: var(--text-soft); }
+
+/* ---------- Guide (신내림 사용 설명서) ---------- */
+.guide-screen{ text-align:center; padding-top: 40px; cursor:pointer; }
+.guide-text{ font-size: 17px; font-weight: 700; line-height:1.7; margin: 24px 0 0; color: var(--text); }
+.guide-text:first-of-type{ margin-top: 28px; }
 .shrine-stopwatch-preview{
   font-size: 40px;
   font-weight: 800;

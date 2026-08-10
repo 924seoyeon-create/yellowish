@@ -5,10 +5,7 @@
   const STORAGE_KEYS = {
     tasks: "noreut_tasks",
     sessions: "noreut_sessions",
-    focus: "noreut_current_focus",
-    seeded: "noreut_seeded",
-    todayGuideSeen: "noreut_today_guide_seen",
-    shrineGuideSeen: "noreut_shrine_guide_seen"
+    focus: "noreut_current_focus"
   };
 
   const state = {
@@ -52,23 +49,14 @@
     home: "다 울었니?<br>이제 할 일을 하자"
   };
 
-  // 첫 방문(또는 "ⓘ 사용법") 때만 보여주는 목적+방법 안내. 이후엔 기본 멘트만 재생된다.
-  const TODAY_GUIDE_STAGES = [
-    { html: "지금 해야 할 일을<br>찾는 곳", holdMs: 1100 },
-    { html: "가장 가까이 온<br>불부터 보세요.", holdMs: 1100 }
-  ];
-  const SHRINE_GUIDE_STAGES = [
-    { html: "집중할 수 있는 순간을<br>바로 써보는 곳.", holdMs: 1100 },
-    { html: "집중이 오면 스톱워치를 켜고,<br>끝나면 기록하세요.", holdMs: 1100 }
-  ];
   // 오늘 페이지는 행동으로의 전환 속도를 우선하므로 멘트 노출을 짧게 유지한다.
   const TODAY_MENTION_HOLD_MS = 750; // 기존 1500ms 대비 50% 단축
   const SHRINE_ARRIVED_HOLD_MS = 750;
 
   const PATTERN_MENTION_STAGES = [
-    { html: "심연을 바라보면", holdMs: 900 },
-    { html: "심연도 나를 바라본다.", holdMs: 900 },
-    { html: "맞짝사랑이다.", holdMs: 1300, gapBefore: 500 }
+    { html: "심연을 바라보면", holdMs: 600 },
+    { html: "심연도 나를 바라본다.", holdMs: 600 },
+    { html: "맞짝사랑이다.", holdMs: 900, gapBefore: 350 }
   ];
 
   const LOCATION_OPTIONS = [
@@ -101,11 +89,6 @@
     try{
       state.currentFocus = JSON.parse(localStorage.getItem(STORAGE_KEYS.focus)) || null;
     }catch(e){ state.currentFocus = null; }
-
-    if(!localStorage.getItem(STORAGE_KEYS.seeded)){
-      seedSampleTask();
-      localStorage.setItem(STORAGE_KEYS.seeded, "1");
-    }
   }
 
   function saveTasks(){ localStorage.setItem(STORAGE_KEYS.tasks, JSON.stringify(state.tasks)); }
@@ -118,26 +101,6 @@
     }
   }
 
-  function seedSampleTask(){
-    const deadline = new Date(Date.now() + 18*60*60*1000);
-    state.tasks.push({
-      id: uid(),
-      title: "보고서 초안 작성",
-      nextAction: "첫 번째 문단 작성하기",
-      deadline: deadline.toISOString(),
-      importance: "high",
-      urgency: 4,
-      externalCommitment: "",
-      externalPerson: "",
-      stoppingRule: "",
-      createdAt: new Date().toISOString(),
-      completedAt: null,
-      status: "active",
-      isSample: true
-    });
-    saveTasks();
-  }
-
   function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,8); }
 
   function reducedMotion(){
@@ -146,10 +109,6 @@
 
   // ============ TASK ============
   function createTask(data){
-    // remove untouched sample task once the user starts adding their own
-    const sampleIdx = state.tasks.findIndex(t => t.isSample && t.status === "active");
-    if(sampleIdx !== -1){ state.tasks.splice(sampleIdx, 1); }
-
     const task = {
       id: uid(),
       title: data.title.trim(),
@@ -157,7 +116,6 @@
       deadline: data.deadline || null,
       importance: data.importance || "medium",
       urgency: Number(data.urgency)||3,
-      externalCommitment: (data.externalCommitment||"").trim(),
       externalPerson: (data.externalPerson||"").trim(),
       stoppingRule: (data.stoppingRule||"").trim(),
       createdAt: new Date().toISOString(),
@@ -309,9 +267,19 @@
   // chain's callbacks become no-ops instead of racing the newer one.
   let mentionSequenceToken = 0;
 
+  // Tapping the mention itself skips straight to the real content instead
+  // of waiting out the remaining stages — 오늘/신내림/패턴 should never make
+  // an impatient tap wait on a flourish.
   function playMentionSequence(containerEl, stages, renderFn){
     const myToken = ++mentionSequenceToken;
     if(reducedMotion() || stages.length === 0){ renderFn(); return; }
+    let done = false;
+    function finish(){
+      if(done) return;
+      done = true;
+      mentionSequenceToken++; // invalidate any still-pending timers for this run
+      renderFn();
+    }
     let i = 0;
     function showStage(){
       if(myToken !== mentionSequenceToken) return;
@@ -320,6 +288,7 @@
         if(myToken !== mentionSequenceToken) return;
         containerEl.innerHTML = `<div class="mention-block"><div class="mention-text">${stage.html}</div></div>`;
         const block = containerEl.querySelector(".mention-block");
+        block.addEventListener("click", finish);
         requestAnimationFrame(()=> block.classList.add("show"));
         setTimeout(()=>{
           if(myToken !== mentionSequenceToken) return;
@@ -328,7 +297,7 @@
             if(myToken !== mentionSequenceToken) return;
             i++;
             if(i < stages.length) showStage();
-            else renderFn();
+            else finish();
           }, MENTION_FADE_MS);
         }, stage.holdMs);
       }, stage.gapBefore || 0);
@@ -336,17 +305,10 @@
     showStage();
   }
 
-  function runTodayIntro(forceGuide){
+  function enterHome(){
     const el = document.getElementById("home-content");
-    const seenGuide = localStorage.getItem(STORAGE_KEYS.todayGuideSeen);
-    const showGuide = forceGuide || !seenGuide;
-    if(!seenGuide) localStorage.setItem(STORAGE_KEYS.todayGuideSeen, "1");
-    const stages = (showGuide ? TODAY_GUIDE_STAGES : []).concat([{ html: MENTIONS.home, holdMs: TODAY_MENTION_HOLD_MS }]);
-    playMentionSequence(el, stages, renderHome);
+    playMentionSequence(el, [{ html: MENTIONS.home, holdMs: TODAY_MENTION_HOLD_MS }], renderHome);
   }
-
-  function enterHome(){ runTodayIntro(false); }
-  function replayTodayGuide(){ runTodayIntro(true); }
 
   function enterPattern(){
     playMentionSequence(document.getElementById("pattern-content"), PATTERN_MENTION_STAGES, renderPatterns);
@@ -359,7 +321,7 @@
     document.getElementById("screen-"+name).classList.add("active");
 
     const nav = document.getElementById("bottom-nav");
-    const hideNavOn = ["focus", "focus-complete", "add-task", "task-detail", "other-tasks", "calendar"];
+    const hideNavOn = ["focus", "focus-complete", "add-task", "task-detail", "other-tasks", "calendar", "guide"];
     nav.classList.toggle("hidden", hideNavOn.includes(name));
 
     document.querySelectorAll("#bottom-nav button").forEach(b=>{
@@ -437,16 +399,17 @@
       container.innerHTML = `
         <div class="empty-state">
           <span class="big-emoji">🦶</span>
-          <h2>아직 오늘의 작업이 없습니다.</h2>
-          <p>오늘 해야 할 일이 있다면<br>하나만 가져와주세요.</p>
-          <button class="btn btn-primary" id="empty-add-btn">+ 오늘의 일 추가</button>
+          <h2>아직 발등에 불이 떨어지지 않았어요.</h2>
+          <p>오늘 해야 할 일이 있다면 가져와주세요</p>
+          <button class="btn btn-primary" id="empty-add-btn">+ 오늘의 작업 추가</button>
         </div>
         <div class="shrine-hint">
-          <span class="bell"><img src="icons/sinnaerim.png" alt=""></span>
-          갑자기 신내림이 오면<br>바로 시작할 수도 있어요.
+          <span class="bell" id="empty-guide-bell" role="button" tabindex="0"><img src="icons/sinnaerim.png" alt=""></span>
+          갑자기 신내림을 받으면<br>바로 시작할 수도 있어요.
         </div>
       `;
       document.getElementById("empty-add-btn").addEventListener("click", ()=>openAddTask());
+      bindActivate(document.getElementById("empty-guide-bell"), ()=>openGuide());
       return;
     }
 
@@ -470,7 +433,6 @@
       <div class="home-links-row">
         <span class="home-link" id="home-calendar-link" role="button" tabindex="0">📅 달력</span>
         ${others > 0 ? `<span class="home-link" id="home-others-link" role="button" tabindex="0">다른 작업 ${others}개</span>` : ""}
-        <span class="home-link" id="home-guide-link" role="button" tabindex="0">ⓘ 사용법</span>
       </div>
     `;
 
@@ -479,7 +441,6 @@
     document.getElementById("home-task-title").addEventListener("keypress", e=>{ if(e.key==="Enter") openTaskDetail(task.id); });
     bindActivate(document.getElementById("home-calendar-link"), ()=>openCalendar("view"));
     bindActivate(document.getElementById("home-others-link"), ()=>openOtherTasks());
-    bindActivate(document.getElementById("home-guide-link"), ()=>replayTodayGuide());
 
     applyUrgencyToHome(task, urgency, overdue, { skipTransition: true });
 
@@ -618,11 +579,13 @@
   function updateDeadlineDateButtonLabel(){
     const btn = document.getElementById("f-deadline-date-btn");
     const clearLink = document.getElementById("f-deadline-clear");
+    const errorEl = document.getElementById("f-deadline-error");
     if(!btn || !clearLink) return;
     if(state.pickedDeadlineDate){
       const [y,m,d] = state.pickedDeadlineDate.split("-");
       btn.textContent = `📅 ${y}년 ${Number(m)}월 ${Number(d)}일`;
       clearLink.hidden = false;
+      if(errorEl) errorEl.hidden = true;
     }else{
       btn.textContent = "📅 날짜 선택";
       clearLink.hidden = true;
@@ -671,6 +634,7 @@
     form.reset();
     state.pickedDeadlineDate = null;
     resetDeadlineTimeSelects();
+    document.getElementById("f-deadline-error").hidden = true;
     document.getElementById("add-task-title").textContent = editId ? "작업 수정" : "무엇을 해야 하나요?";
 
     if(editId){
@@ -685,7 +649,6 @@
         }
         document.querySelector(`input[name=importance][value="${t.importance}"]`).checked = true;
         document.querySelector(`input[name=urgency][value="${t.urgency}"]`).checked = true;
-        document.getElementById("f-commit").value = t.externalCommitment||"";
         document.getElementById("f-person").value = t.externalPerson||"";
         document.getElementById("f-stop").value = t.stoppingRule||"";
       }
@@ -699,10 +662,14 @@
     const title = document.getElementById("f-title").value.trim();
     if(!title) return;
 
-    let deadlineIso = null;
-    if(state.pickedDeadlineDate){
-      deadlineIso = new Date(`${state.pickedDeadlineDate}T${getDeadlineTimeValue()}:00`).toISOString();
+    const deadlineError = document.getElementById("f-deadline-error");
+    if(!state.pickedDeadlineDate){
+      deadlineError.hidden = false;
+      document.getElementById("f-deadline-date-btn").focus();
+      return;
     }
+    deadlineError.hidden = true;
+    const deadlineIso = new Date(`${state.pickedDeadlineDate}T${getDeadlineTimeValue()}:00`).toISOString();
 
     const data = {
       title,
@@ -710,7 +677,6 @@
       deadline: deadlineIso,
       importance: document.querySelector('input[name=importance]:checked').value,
       urgency: document.querySelector('input[name=urgency]:checked').value,
-      externalCommitment: document.getElementById("f-commit").value,
       externalPerson: document.getElementById("f-person").value,
       stoppingRule: document.getElementById("f-stop").value
     };
@@ -793,6 +759,11 @@
   document.getElementById("detail-back").addEventListener("click", ()=>showScreen("home"));
 
   document.getElementById("shrine-back").addEventListener("click", ()=>showScreen("home"));
+
+  // ============ GUIDE (신내림 사용 설명서) ============
+  function openGuide(){ showScreen("guide"); }
+  document.getElementById("guide-back").addEventListener("click", ()=>showScreen("home"));
+  bindActivate(document.getElementById("guide-cta"), ()=>openShrine());
 
   document.getElementById("header-add-btn").addEventListener("click", ()=>openAddTask());
 
@@ -959,48 +930,33 @@
 
   // ============ SHRINE (신내림) ============
   // Not a countdown. 왔다 → 바로 시작 가능한 count-up 스톱워치. See §9-14.
-  function runShrineIntro(forceGuide){
+  function openShrine(){
     showScreen("shrine");
     playBellSound();
     const container = document.getElementById("shrine-content");
-    const seenGuide = localStorage.getItem(STORAGE_KEYS.shrineGuideSeen);
-    const showGuide = forceGuide || !seenGuide;
-    if(!seenGuide) localStorage.setItem(STORAGE_KEYS.shrineGuideSeen, "1");
-
-    function showArrived(){
-      container.innerHTML = `
-        <span class="bell-big"><img src="icons/sinnaerim.png" alt=""></span>
-        <div class="shrine-arrived">왔다</div>
-      `;
-      setTimeout(renderShrineReady, reducedMotion() ? 0 : SHRINE_ARRIVED_HOLD_MS);
-    }
-
-    if(showGuide){
-      playMentionSequence(container, SHRINE_GUIDE_STAGES, showArrived);
-    }else{
-      showArrived();
-    }
+    container.innerHTML = `
+      <span class="bell-big"><img src="icons/sinnaerim.png" alt=""></span>
+      <div class="shrine-arrived">왔다</div>
+    `;
+    setTimeout(renderShrineReady, reducedMotion() ? 0 : SHRINE_ARRIVED_HOLD_MS);
   }
-
-  function openShrine(){ runShrineIntro(false); }
-  function replayShrineGuide(){ runShrineIntro(true); }
 
   function renderShrineReady(){
     const container = document.getElementById("shrine-content");
     const task = selectShrineTask();
     container.innerHTML = `
       <span class="bell-big small"><img src="icons/sinnaerim.png" alt=""></span>
-      <div class="shrine-question">집중할 수 있는 순간이 왔어?</div>
-      <div class="shrine-answer">그럼 지금 써.</div>
+      <div class="shrine-question">지금의 마감이</div>
+      <div class="shrine-answer">미래의 나를 구한다(제발)</div>
       ${task ? `<div class="shrine-current-task">지금: ${escapeHtml(task.title)}</div>` : ""}
       <div class="shrine-stopwatch-preview">00:00:00</div>
       <button type="button" class="btn btn-primary" id="shrine-start-btn">시작</button>
-      <div class="home-link" id="shrine-guide-link" role="button" tabindex="0" style="margin-top:18px;">ⓘ 사용법</div>
+      <div class="home-link" id="shrine-guide-link" role="button" tabindex="0" style="margin-top:18px;">사용법</div>
     `;
     document.getElementById("shrine-start-btn").addEventListener("click", ()=>{
       startShrineStopwatch(task ? task.id : null);
     });
-    bindActivate(document.getElementById("shrine-guide-link"), ()=>replayShrineGuide());
+    bindActivate(document.getElementById("shrine-guide-link"), ()=>openGuide());
   }
 
   function startShrineStopwatch(taskId){
@@ -1426,7 +1382,6 @@
         localStorage.removeItem(STORAGE_KEYS.tasks);
         localStorage.removeItem(STORAGE_KEYS.sessions);
         localStorage.removeItem(STORAGE_KEYS.focus);
-        localStorage.removeItem(STORAGE_KEYS.seeded);
         location.reload();
       }
     });
